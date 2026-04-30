@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
+    bootstrap="tests/bootstrap.php"
+    cacheDirectory=".phpunit.cache"
+    executionOrder="depends,defects"
+    beStrictAboutOutputDuringTests="true"
+    beStrictAboutTodoAnnotations="true"
+    failOnRisky="true"
+    failOnWarning="true"
+    colors="true"
+>
+    <testsuites>
+        <testsuite name="ClientFlow">
+            <directory>tests/</directory>
+        </testsuite>
+    </testsuites>
+
+    <source>
+        <include>
+            <directory>clientflow.php</directory>
+            <directory>includes/</directory>
+            <directory>rest-api/</directory>
+            <directory>database/</directory>
+        </include>
+        <exclude>
+            <directory>vendor/</directory>
+            <directory>node_modules/</directory>
+        </exclude>
+    </source>
+
+    <coverage>
+        <report>
+            <html outputDirectory="tests/coverage/html" />
+            <text outputFile="tests/coverage/coverage.txt" showOnlySummary="true" />
+        </report>
+    </coverage>
+</phpunit>
