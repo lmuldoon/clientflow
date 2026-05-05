@@ -328,6 +328,8 @@ const CSS = `
 `;
 
 const ACTIONABLE = [ 'draft', 'sent', 'viewed' ];
+const CURRENCY_FMT = ( amount, currency = 'GBP' ) =>
+	new Intl.NumberFormat( 'en-GB', { style: 'currency', currency } ).format( amount );
 
 function DeclineModal( { onConfirm, onCancel } ) {
 	const [ reason, setReason ] = useState( '' );
@@ -392,7 +394,7 @@ function DeclineModal( { onConfirm, onCancel } ) {
 	);
 }
 
-export default function ClientActionButtons( { status, paymentEnabled, hasPaid, ownerEmail, onAccept, onDecline, onPayment, loading } ) {
+export default function ClientActionButtons( { status, paymentEnabled, hasPaid, remainingBalance, ownerEmail, onAccept, onDecline, onPayment, loading } ) {
 	injectStyles( 'cf-actions-s', CSS );
 
 	const [ showModal, setShowModal ] = useState( false );
@@ -402,7 +404,11 @@ export default function ClientActionButtons( { status, paymentEnabled, hasPaid, 
 		onDecline( reason );
 	}
 
-	const showPaymentButton = status === 'accepted' && paymentEnabled && ! hasPaid;
+	const hasRemainingBalance = remainingBalance > 0;
+	const showPaymentButton = paymentEnabled && (
+		( status === 'accepted' && ! hasPaid ) ||
+		( status === 'completed' && hasRemainingBalance )
+	);
 
 	// Terminal non-payment state — minimal bar
 	if ( ! ACTIONABLE.includes( status ) && ! showPaymentButton ) {
@@ -430,6 +436,14 @@ export default function ClientActionButtons( { status, paymentEnabled, hasPaid, 
 					{ status === 'expired' && (
 						<span className="cfa-status cfa-status--expired">
 							This proposal has expired
+						</span>
+					) }
+					{ status === 'completed' && (
+						<span className="cfa-status cfa-status--accepted">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+								<polyline points="20 6 9 17 4 12"/>
+							</svg>
+							Project Complete
 						</span>
 					) }
 				</div>
@@ -489,6 +503,8 @@ export default function ClientActionButtons( { status, paymentEnabled, hasPaid, 
 						>
 							{ loading ? (
 								<><div className="cfa-spinner" />Preparing…</>
+							) : status === 'completed' && hasRemainingBalance ? (
+								`Pay remaining balance →`
 							) : (
 								'Proceed to Payment →'
 							) }

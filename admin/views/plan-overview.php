@@ -179,7 +179,6 @@ $upgrade_url = admin_url( 'admin.php?page=clientflow-upgrade' );
 
 /* ─── Layout ──────────────────────────────────────────────────────────── */
 #cf-admin-wrap {
-    max-width: 1100px;
     padding: 32px 28px 64px;
 }
 

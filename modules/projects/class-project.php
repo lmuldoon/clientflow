@@ -85,8 +85,8 @@ class ClientFlow_Project {
 		$mt = $wpdb->prefix . 'clientflow_milestones';
 
 		$where = $owner_id
-			? $wpdb->prepare( "pr.id = %d AND pr.owner_id = %d", $id, $owner_id )
-			: $wpdb->prepare( "pr.id = %d", $id );
+			? $wpdb->prepare( "pr.id = %d AND pr.owner_id = %d AND pr.deleted_at IS NULL", $id, $owner_id )
+			: $wpdb->prepare( "pr.id = %d AND pr.deleted_at IS NULL", $id );
 
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$row = $wpdb->get_row(
@@ -145,7 +145,7 @@ class ClientFlow_Project {
 		$pt = $wpdb->prefix . 'clientflow_proposals';
 		$mt = $wpdb->prefix . 'clientflow_milestones';
 
-		$where = [ $wpdb->prepare( "pr.owner_id = %d", $owner_id ) ];
+		$where = [ $wpdb->prepare( "pr.owner_id = %d", $owner_id ), "pr.deleted_at IS NULL" ];
 
 		if ( $status && in_array( $status, [ 'active', 'on-hold', 'completed' ], true ) ) {
 			$where[] = $wpdb->prepare( "pr.status = %s", $status );
@@ -280,27 +280,25 @@ class ClientFlow_Project {
 	public static function delete( int $id, int $owner_id ): true|WP_Error {
 		global $wpdb;
 
-		$project = $wpdb->get_row(
+		$exists = $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT proposal_id FROM " . self::table() . " WHERE id = %d AND owner_id = %d",
+				"SELECT id FROM " . self::table() . " WHERE id = %d AND owner_id = %d AND deleted_at IS NULL",
 				$id,
 				$owner_id
 			)
 		);
 
-		if ( ! $project ) {
+		if ( ! $exists ) {
 			return new WP_Error( 'project_not_found', __( 'Project not found.', 'clientflow' ), [ 'status' => 404 ] );
 		}
 
-		$wpdb->delete( $wpdb->prefix . 'clientflow_milestones', [ 'project_id' => $id ] );
-		$wpdb->delete( $wpdb->prefix . 'clientflow_messages',  [ 'project_id' => $id ] );
-		$wpdb->delete( $wpdb->prefix . 'clientflow_approvals', [ 'project_id' => $id ] );
-
-		if ( $project->proposal_id ) {
-			$wpdb->delete( $wpdb->prefix . 'clientflow_payments', [ 'proposal_id' => $project->proposal_id ] );
-		}
-
-		$wpdb->delete( self::table(), [ 'id' => $id, 'owner_id' => $owner_id ] );
+		$wpdb->update(
+			self::table(),
+			[ 'deleted_at' => current_time( 'mysql' ) ],
+			[ 'id' => $id, 'owner_id' => $owner_id ],
+			[ '%s' ],
+			[ '%d', '%d' ]
+		);
 
 		return true;
 	}

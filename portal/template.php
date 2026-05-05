@@ -24,7 +24,8 @@ if ( ClientFlow_Portal_Auth::is_authenticated() ) {
 
 // Business identity.
 $cf_business_name = get_option( 'blogname', '' );
-$cf_business_logo = get_option( 'clientflow_business_logo', '' );
+$cf_business_logo = get_option( 'clientflow_logo_url', '' );
+$cf_brand_color   = get_option( 'clientflow_brand_color', '#6366F1' );
 
 // For the verify page, pass the raw token from the query string so the
 // PortalVerify component can fire the verify API immediately on mount.
@@ -85,7 +86,9 @@ window.cfPortalData = <?php echo wp_json_encode( [
 	'clientData'      => $cf_client_data,
 	'businessName'    => $cf_business_name,
 	'businessLogo'    => $cf_business_logo,
+	'brandColor'      => $cf_brand_color,
 	'verifyToken'     => $cf_verify_token,
+	'pluginUrl'       => CLIENTFLOW_URL,
 ] ); ?>;
 </script>
 

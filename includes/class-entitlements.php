@@ -323,8 +323,8 @@ class ClientFlow_Entitlements {
 		if ( 'create_proposal' === $feature ) {
 			return (int) ( $wpdb->get_var(
 				$wpdb->prepare(
-					"SELECT proposals_created_total FROM {$wpdb->prefix}clientflow_user_meta
-					 WHERE user_id = %d",
+					"SELECT COUNT(*) FROM {$wpdb->prefix}clientflow_proposals
+					 WHERE owner_id = %d AND deleted_at IS NULL",
 					$user_id
 				)
 			) ?? 0 );
@@ -616,19 +616,17 @@ class ClientFlow_Entitlements {
 			return;
 		}
 
+		$new_plan_label = esc_html( ucfirst( $new_plan ) );
 		wp_mail(
 			$user->user_email,
 			__( 'Your ClientFlow plan has changed', 'clientflow' ),
-			sprintf(
-				/* translators: 1: new plan name */
-				__(
-					"You've been moved to the %s plan. Some features are now restricted.\n\n"
-					. "Your usage counters will reset at the start of next month.\n\n"
-					. "Questions? Reply to this email or visit your account settings.",
-					'clientflow'
-				),
-				ucfirst( $new_plan )
-			)
+			cf_email_html( [
+				'name' => $user->display_name,
+				'body' => "<p style=\"margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;\">Your ClientFlow plan has been changed to <strong style=\"color:#1A1A2E;\">{$new_plan_label}</strong>. Some features may now be restricted.</p><p style=\"margin:0;font-size:16px;color:#6B7280;line-height:1.65;\">Your usage counters will reset at the start of next month. If you have any questions, please get in touch.</p>",
+				'cta_label' => __( 'View Account', 'clientflow' ),
+				'cta_url'   => admin_url( 'admin.php?page=clientflow-account' ),
+			] ),
+			[ 'Content-Type: text/html; charset=UTF-8' ]
 		);
 	}
 }

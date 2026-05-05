@@ -420,7 +420,7 @@ export default function PaymentSuccess( { token, sessionId } ) {
 
 				<h1 className="cfps-title">Payment Confirmed</h1>
 				<p className="cfps-subtitle">
-					Thank you — your proposal has been accepted.
+					Thank you — your payment has been received.
 				</p>
 
 				{ /* Details */ }
@@ -466,8 +466,8 @@ export default function PaymentSuccess( { token, sessionId } ) {
 
 				{ /* Actions */ }
 				<div className="cfps-actions">
-					<a href="/portal/logout" className="cfps-portal-btn">
-						Access Your Client Portal
+					<a href="/clientflow/dashboard" className="cfps-portal-btn">
+						Go to Client Portal
 						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
 							<polyline points="9 18 15 12 9 6"/>
 						</svg>

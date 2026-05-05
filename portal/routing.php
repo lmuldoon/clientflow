@@ -32,49 +32,61 @@ add_action( 'init', 'cf_add_portal_rewrite_rules' );
 function cf_add_portal_rewrite_rules(): void {
 	// /portal → redirect to /portal/login (handled in template_redirect below).
 	add_rewrite_rule(
-		'^portal/?$',
+		'^clientflow/?$',
 		'index.php?cf_portal_page=login',
 		'top'
 	);
 
 	add_rewrite_rule(
-		'^portal/login/?$',
+		'^clientflow/login/?$',
 		'index.php?cf_portal_page=login',
 		'top'
 	);
 
 	add_rewrite_rule(
-		'^portal/verify/?$',
+		'^clientflow/verify/?$',
 		'index.php?cf_portal_page=verify',
 		'top'
 	);
 
 	add_rewrite_rule(
-		'^portal/dashboard/?$',
+		'^clientflow/dashboard/?$',
 		'index.php?cf_portal_page=dashboard',
 		'top'
 	);
 
 	add_rewrite_rule(
-		'^portal/proposals/?$',
+		'^clientflow/proposals/?$',
 		'index.php?cf_portal_page=proposals',
 		'top'
 	);
 
 	add_rewrite_rule(
-		'^portal/payments/?$',
+		'^clientflow/payments/?$',
 		'index.php?cf_portal_page=payments',
 		'top'
 	);
 
 	add_rewrite_rule(
-		'^portal/projects/?$',
+		'^clientflow/projects/?$',
 		'index.php?cf_portal_page=projects',
 		'top'
 	);
 
 	add_rewrite_rule(
-		'^portal/logout/?$',
+		'^clientflow/set-password/?$',
+		'index.php?cf_portal_page=set-password',
+		'top'
+	);
+
+	add_rewrite_rule(
+		'^clientflow/receipt/?$',
+		'index.php?cf_portal_page=receipt',
+		'top'
+	);
+
+	add_rewrite_rule(
+		'^clientflow/logout/?$',
 		'index.php?cf_portal_page=logout',
 		'top'
 	);
@@ -91,26 +103,40 @@ function cf_portal_template_redirect(): void {
 		return;
 	}
 
-	$authenticated_pages = [ 'dashboard', 'proposals', 'payments', 'projects' ];
+	$authenticated_pages = [ 'dashboard', 'proposals', 'payments', 'projects', 'receipt' ];
 	$public_pages        = [ 'login', 'verify' ];
+
+	// /portal/set-password — auth required; bypass if password already set.
+	if ( 'set-password' === $page ) {
+		if ( ! ClientFlow_Portal_Auth::is_authenticated() ) {
+			wp_safe_redirect( home_url( '/clientflow/login' ) );
+			exit;
+		}
+		if ( ClientFlow_Portal_Auth::has_set_password( get_current_user_id() ) ) {
+			wp_safe_redirect( home_url( '/clientflow/dashboard' ) );
+			exit;
+		}
+		require CLIENTFLOW_DIR . 'portal/template.php';
+		exit;
+	}
 
 	// /portal/logout — clear session and redirect to login.
 	if ( 'logout' === $page ) {
 		wp_logout();
-		wp_safe_redirect( home_url( '/portal/login' ) );
+		wp_safe_redirect( home_url( '/clientflow/login' ) );
 		exit;
 	}
 
 	if ( in_array( $page, $authenticated_pages, true ) ) {
 		// Auth gate: unauthenticated clients → login.
 		if ( ! ClientFlow_Portal_Auth::is_authenticated() ) {
-			wp_safe_redirect( home_url( '/portal/login' ) );
+			wp_safe_redirect( home_url( '/clientflow/login' ) );
 			exit;
 		}
 	} elseif ( in_array( $page, $public_pages, true ) ) {
 		// Already logged-in clients hitting /login → dashboard.
 		if ( 'login' === $page && ClientFlow_Portal_Auth::is_authenticated() ) {
-			wp_safe_redirect( home_url( '/portal/dashboard' ) );
+			wp_safe_redirect( home_url( '/clientflow/dashboard' ) );
 			exit;
 		}
 	} else {

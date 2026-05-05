@@ -371,11 +371,20 @@ class ClientFlow_Proposal {
 		}
 
 		if ( 'accepted' === $proposal->status ) {
-			return new WP_Error(
-				'proposal_accepted',
-				__( 'This proposal has an active project. Delete the project first if you want to remove it.', 'clientflow' ),
-				[ 'status' => 422 ]
+			$project_exists = (bool) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$wpdb->prefix}clientflow_projects WHERE proposal_id = %d LIMIT 1",
+					$id
+				)
 			);
+
+			if ( $project_exists ) {
+				return new WP_Error(
+					'proposal_accepted',
+					__( 'This proposal has an active project. Delete the project first if you want to remove it.', 'clientflow' ),
+					[ 'status' => 422 ]
+				);
+			}
 		}
 
 		// Soft-delete: stamp deleted_at so the row is preserved for analytics and project references.

@@ -85,14 +85,14 @@ class ClientFlow_Analytics {
 
 		$proposals_accepted = (int) $wpdb->get_var( $wpdb->prepare(
 			"SELECT COUNT(*) FROM {$p_table}
-			 WHERE owner_id = %d AND status = 'accepted' AND sent_at BETWEEN %s AND %s",
+			 WHERE owner_id = %d AND status IN ('accepted','completed') AND sent_at BETWEEN %s AND %s",
 			$owner_id, $from, $to
 		) );
 
 		$avg_days = (float) $wpdb->get_var( $wpdb->prepare(
 			"SELECT COALESCE(AVG(TIMESTAMPDIFF(DAY, sent_at, accepted_at)),0)
 			 FROM {$p_table}
-			 WHERE owner_id = %d AND accepted_at IS NOT NULL AND sent_at BETWEEN %s AND %s",
+			 WHERE owner_id = %d AND accepted_at IS NOT NULL AND status IN ('accepted','completed') AND sent_at BETWEEN %s AND %s",
 			$owner_id, $from, $to
 		) );
 
@@ -178,11 +178,11 @@ class ClientFlow_Analytics {
 		$overall = $wpdb->get_row( $wpdb->prepare(
 			"SELECT
 			   COUNT(*) AS closed,
-			   SUM(status = 'accepted') AS accepted,
+			   SUM(status IN ('accepted','completed')) AS accepted,
 			   COALESCE(AVG(CASE WHEN accepted_at IS NOT NULL THEN TIMESTAMPDIFF(DAY, sent_at, accepted_at) END), 0) AS avg_days
 			 FROM {$p_table}
 			 WHERE owner_id = %d
-			   AND status IN ('accepted','declined')
+			   AND status IN ('accepted','declined','completed')
 			   AND sent_at BETWEEN %s AND %s",
 			$owner_id, $from, $to
 		), ARRAY_A );
@@ -199,7 +199,7 @@ class ClientFlow_Analytics {
 			   SUM(status = 'accepted') AS accepted
 			 FROM {$p_table}
 			 WHERE owner_id = %d
-			   AND status IN ('accepted','declined')
+			   AND status IN ('accepted','declined','completed')
 			   AND sent_at BETWEEN %s AND %s
 			 GROUP BY template_id
 			 ORDER BY SUM(status = 'accepted') / COUNT(*) DESC",
@@ -258,7 +258,7 @@ class ClientFlow_Analytics {
 			UNION ALL
 			(SELECT 'accepted', CONCAT('Proposal accepted: ', title), accepted_at, total_amount
 			 FROM {$p}clientflow_proposals
-			 WHERE owner_id = %d AND status = 'accepted' AND accepted_at IS NOT NULL)
+			 WHERE owner_id = %d AND status IN ('accepted','completed') AND accepted_at IS NOT NULL)
 			UNION ALL
 			(SELECT 'sent', CONCAT('Proposal sent: ', title), sent_at, total_amount
 			 FROM {$p}clientflow_proposals
@@ -271,7 +271,7 @@ class ClientFlow_Analytics {
 			UNION ALL
 			(SELECT 'project', CONCAT('Project started: ', name), created_at, NULL
 			 FROM {$p}clientflow_projects
-			 WHERE owner_id = %d AND created_at IS NOT NULL)
+			 WHERE owner_id = %d AND created_at IS NOT NULL AND deleted_at IS NULL)
 			ORDER BY ts DESC
 			LIMIT %d",
 			$owner_id, $owner_id, $owner_id, $owner_id, $owner_id, $lim

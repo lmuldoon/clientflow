@@ -195,6 +195,7 @@ function clientflow_create_tables(): void {
 		created_at DATETIME DEFAULT NULL,
 		updated_at DATETIME DEFAULT NULL,
 		completed_at DATETIME DEFAULT NULL,
+		deleted_at DATETIME DEFAULT NULL,
 
 		PRIMARY KEY  (id),
 		KEY owner_id (owner_id),
@@ -202,6 +203,9 @@ function clientflow_create_tables(): void {
 		KEY proposal_id (proposal_id),
 		KEY status (status)
 	) $charset_collate;" );
+
+	// Ensure deleted_at exists on existing installations.
+	$wpdb->query( "ALTER TABLE {$wpdb->prefix}clientflow_projects ADD COLUMN IF NOT EXISTS deleted_at DATETIME DEFAULT NULL" );
 
 	// ────────────────────────────────────────────────────────────────────────
 	// Table 6: clientflow_milestones

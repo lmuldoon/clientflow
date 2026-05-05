@@ -99,10 +99,17 @@ function cf_rest_client_get_proposal( WP_REST_Request $request ): WP_REST_Respon
 	if ( ! class_exists( 'ClientFlow_Payment' ) && file_exists( $base ) ) {
 		require_once $base;
 	}
+	$remaining_balance = 0.0;
 	if ( class_exists( 'ClientFlow_Payment' ) ) {
-		$has_paid = ClientFlow_Payment::has_completed_payment( (int) $result['id'] );
+		$has_paid  = ClientFlow_Payment::has_completed_payment( (int) $result['id'] );
+		$payments  = ClientFlow_Payment::get_for_proposal( (int) $result['id'] );
+		$total_paid = array_reduce( $payments, static function ( float $carry, array $pm ): float {
+			return $carry + ( 'completed' === $pm['status'] ? (float) $pm['amount'] : 0.0 );
+		}, 0.0 );
+		$remaining_balance = max( 0.0, (float) ( $result['total_amount'] ?? 0 ) - $total_paid );
 	}
-	$result['has_paid'] = $has_paid;
+	$result['has_paid']          = $has_paid;
+	$result['remaining_balance'] = $remaining_balance;
 
 	return new WP_REST_Response( [ 'proposal' => $result ], 200 );
 }

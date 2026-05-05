@@ -46,16 +46,22 @@ function cf_rest_list_clients( WP_REST_Request $request ): WP_REST_Response {
 			"SELECT c.*,
 			        ( SELECT p.title
 			          FROM   {$pt} p
-			          WHERE  p.client_id = c.id AND p.status = 'accepted'
+			          WHERE  p.client_id = c.id AND p.status IN ('accepted','completed')
 			          ORDER  BY p.accepted_at DESC
 			          LIMIT  1
 			        ) AS latest_proposal_title,
-			        ( SELECT p.accepted_at
+			        ( SELECT p.status
 			          FROM   {$pt} p
-			          WHERE  p.client_id = c.id AND p.status = 'accepted'
+			          WHERE  p.client_id = c.id AND p.status IN ('accepted','completed')
 			          ORDER  BY p.accepted_at DESC
 			          LIMIT  1
-			        ) AS latest_proposal_accepted_at
+			        ) AS latest_proposal_status,
+			        ( SELECT CASE WHEN p.status = 'completed' THEN p.updated_at ELSE p.accepted_at END
+			          FROM   {$pt} p
+			          WHERE  p.client_id = c.id AND p.status IN ('accepted','completed')
+			          ORDER  BY p.accepted_at DESC
+			          LIMIT  1
+			        ) AS latest_proposal_date
 			 FROM   {$ct} c
 			 WHERE  c.owner_id = %d
 			 ORDER  BY c.created_at DESC",
@@ -127,14 +133,19 @@ function cf_rest_invite_client( WP_REST_Request $request ): WP_REST_Response|WP_
 			"SELECT c.*,
 			        ( SELECT p.title
 			          FROM   {$wpdb->prefix}clientflow_proposals p
-			          WHERE  p.client_id = c.id AND p.status = 'accepted'
+			          WHERE  p.client_id = c.id AND p.status IN ('accepted','completed')
 			          ORDER  BY p.accepted_at DESC LIMIT 1
 			        ) AS latest_proposal_title,
-			        ( SELECT p.accepted_at
+			        ( SELECT p.status
 			          FROM   {$wpdb->prefix}clientflow_proposals p
-			          WHERE  p.client_id = c.id AND p.status = 'accepted'
+			          WHERE  p.client_id = c.id AND p.status IN ('accepted','completed')
 			          ORDER  BY p.accepted_at DESC LIMIT 1
-			        ) AS latest_proposal_accepted_at
+			        ) AS latest_proposal_status,
+			        ( SELECT CASE WHEN p.status = 'completed' THEN p.updated_at ELSE p.accepted_at END
+			          FROM   {$wpdb->prefix}clientflow_proposals p
+			          WHERE  p.client_id = c.id AND p.status IN ('accepted','completed')
+			          ORDER  BY p.accepted_at DESC LIMIT 1
+			        ) AS latest_proposal_date
 			 FROM   {$wpdb->prefix}clientflow_clients c
 			 WHERE  c.id = %d",
 			$client_id

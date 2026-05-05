@@ -176,7 +176,7 @@ export default function App() {
 	}
 
 	return (
-		<div id="cf-app" style={ { maxWidth: 1100, padding: '0 0 48px' } }>
+		<div id="cf-app" style={ { padding: '32px 28px 64px' } }>
 			{ view === 'list' && (
 				<ProposalList
 					proposals={ proposals }

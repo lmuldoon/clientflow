@@ -116,7 +116,7 @@ function cf_rest_payment_create_session( WP_REST_Request $request ): WP_REST_Res
 	}
 
 	// ── Check status allows payment ──────────────────────────────────────────
-	$payable = [ 'accepted', 'draft', 'sent', 'viewed' ];
+	$payable = [ 'accepted', 'draft', 'sent', 'viewed', 'completed' ];
 	if ( ! in_array( $proposal['status'], $payable, true ) ) {
 		return new WP_Error(
 			'invalid_proposal_status',
@@ -144,6 +144,26 @@ function cf_rest_payment_create_session( WP_REST_Request $request ): WP_REST_Res
 		: 100;
 	$charge          = round( $total * ( $deposit_pct / 100 ), 2 );
 
+	// If payments have already been made, charge only the remaining balance.
+	$existing_payments = ClientFlow_Payment::get_for_proposal( (int) $proposal['id'] );
+	$total_paid        = array_reduce( $existing_payments, static function ( float $carry, array $pm ): float {
+		return $carry + ( 'completed' === $pm['status'] ? (float) $pm['amount'] : 0.0 );
+	}, 0.0 );
+
+	$is_balance_payment = $total_paid > 0.0;
+	if ( $is_balance_payment ) {
+		$remaining = round( $total - $total_paid, 2 );
+		if ( $remaining <= 0 ) {
+			return new WP_Error(
+				'already_paid',
+				__( 'This proposal has already been paid in full.', 'clientflow' ),
+				[ 'status' => 422 ]
+			);
+		}
+		$charge      = $remaining;
+		$deposit_pct = 100; // Treat the balance payment as a full-amount charge.
+	}
+
 	if ( $charge <= 0 ) {
 		return new WP_Error(
 			'invalid_amount',
@@ -170,9 +190,9 @@ function cf_rest_payment_create_session( WP_REST_Request $request ): WP_REST_Res
 		);
 	}
 
-	$deposit_note = ( $deposit_pct < 100 )
-		? sprintf( ' (%d%% deposit)', $deposit_pct )
-		: '';
+	$deposit_note = $is_balance_payment
+		? __( ' (remaining balance)', 'clientflow' )
+		: ( $deposit_pct < 100 ? sprintf( ' (%d%% deposit)', $deposit_pct ) : '' );
 
 	// ── Build Stripe URLs ────────────────────────────────────────────────────
 	$success_url = site_url( '/proposals/' . $token . '/success' ) . '?session_id={CHECKOUT_SESSION_ID}';
@@ -240,34 +260,46 @@ function cf_rest_payment_create_session( WP_REST_Request $request ): WP_REST_Res
 function cf_rest_payment_status( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$session_id = (string) $request->get_param( 'session_id' );
 
-	// Try local DB first.
-	$payment = ClientFlow_Payment::get_by_session_id( $session_id );
+	// Helper: build the standard response array from a payment record.
+	$make_response = static fn( array $p ): array => [
+		'status'       => $p['status'],
+		'amount'       => $p['amount'],
+		'currency'     => $p['currency'],
+		'deposit_pct'  => $p['deposit_pct'],
+		'completed_at' => $p['completed_at'] ?? null,
+	];
 
-	if ( ! is_wp_error( $payment ) ) {
-		return new WP_REST_Response( [
-			'status'     => $payment['status'],
-			'amount'     => $payment['amount'],
-			'currency'   => $payment['currency'],
-			'deposit_pct' => $payment['deposit_pct'],
-			'completed_at' => $payment['completed_at'] ?? null,
-		], 200 );
+	// Try local DB first. If the payment is already in a terminal state, return immediately.
+	$payment = ClientFlow_Payment::get_by_session_id( $session_id );
+	if ( ! is_wp_error( $payment ) && in_array( $payment['status'], [ 'completed', 'failed', 'refunded' ], true ) ) {
+		return new WP_REST_Response( $make_response( $payment ), 200 );
 	}
 
-	// Fall back to Stripe API if not yet in our DB (webhook may not have fired).
+	// Payment is pending (or not yet in DB) — check Stripe directly.
 	if ( ! ClientFlow_Stripe::is_configured() ) {
 		return new WP_REST_Response( [ 'status' => 'pending' ], 200 );
 	}
 
 	$stripe_session = ClientFlow_Stripe::retrieve_session( $session_id );
-
 	if ( is_wp_error( $stripe_session ) ) {
 		return new WP_REST_Response( [ 'status' => 'pending' ], 200 );
 	}
 
-	$stripe_status = $stripe_session['payment_status'] ?? 'unpaid';
-	$status        = ( 'paid' === $stripe_status ) ? 'completed' : 'pending';
+	if ( 'paid' === ( $stripe_session['payment_status'] ?? '' ) ) {
+		// Write-through: process fully as if the webhook had fired.
+		// cf_handle_checkout_complete is idempotent — mark_complete updates by
+		// session_id, and cf_proposal_accepted checks status before creating a project.
+		cf_handle_checkout_complete( $stripe_session );
 
-	return new WP_REST_Response( [ 'status' => $status ], 200 );
+		$payment = ClientFlow_Payment::get_by_session_id( $session_id );
+		if ( ! is_wp_error( $payment ) ) {
+			return new WP_REST_Response( $make_response( $payment ), 200 );
+		}
+
+		return new WP_REST_Response( [ 'status' => 'completed' ], 200 );
+	}
+
+	return new WP_REST_Response( [ 'status' => 'pending' ], 200 );
 }
 
 /**
@@ -406,31 +438,40 @@ function cf_notify_owner_payment_complete( int $owner_id, array $proposal, array
 		return;
 	}
 
-	$amount_raw = ( $session['amount_total'] ?? 0 ) / 100;
-	$currency   = strtoupper( $session['currency'] ?? 'GBP' );
-	$amount_fmt = number_format( $amount_raw, 2 );
+	$amount_raw    = ( $session['amount_total'] ?? 0 ) / 100;
+	$currency      = strtoupper( $session['currency'] ?? 'GBP' );
+	$amount_fmt    = $currency . ' ' . number_format( $amount_raw, 2 );
+	$proposal_title = esc_html( $proposal['title'] ?? 'Proposal' );
 
-	$subject = sprintf(
-		/* translators: %s: Proposal title */
-		__( '[ClientFlow] Payment received for "%s"', 'clientflow' ),
-		$proposal['title'] ?? 'Proposal'
-	);
-
-	$message = sprintf(
-		/* translators: 1: proposal title, 2: amount, 3: currency */
-		__(
-			"Your client just paid their proposal.\n\nProposal: %1\$s\nAmount: %2\$s %3\$s\n\nLog in to your dashboard to view the proposal and kick off the project.",
-			'clientflow'
-		),
-		$proposal['title'] ?? 'Proposal',
-		$amount_fmt,
-		$currency
-	);
-
+	// Owner notification.
+	$subject = sprintf( __( '💰 Payment received for "%s"', 'clientflow' ), $proposal['title'] ?? 'Proposal' );
 	wp_mail(
 		$owner->user_email,
 		$subject,
-		$message,
-		[ 'Content-Type: text/plain; charset=UTF-8' ]
+		cf_email_html( [
+			'name'      => $owner->display_name,
+			'body'      => "<p style=\"margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;\">A payment of <strong style=\"color:#1A1A2E;\">{$amount_fmt}</strong> has been received for your proposal <em>{$proposal_title}</em>.</p>",
+			'cta_label' => __( 'View Proposal', 'clientflow' ),
+			'cta_url'   => admin_url( 'admin.php?page=clientflow-proposals' ),
+		] ),
+		[ 'Content-Type: text/html; charset=UTF-8' ]
 	);
+
+	// Client receipt email.
+	if ( ! empty( $proposal['client_id'] ) ) {
+		$client = get_userdata( (int) $proposal['client_id'] );
+		if ( $client ) {
+			wp_mail(
+				$client->user_email,
+				sprintf( __( 'Payment confirmed — %s', 'clientflow' ), $proposal['title'] ?? 'Proposal' ),
+				cf_email_html( [
+					'name'      => $client->display_name,
+					'body'      => "<p style=\"margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;\">We have received your payment of <strong style=\"color:#1A1A2E;\">{$amount_fmt}</strong> for <em>{$proposal_title}</em>. Thank you!</p><p style=\"margin:0;font-size:16px;color:#6B7280;line-height:1.65;\">You can view your payment history from your client portal.</p>",
+					'cta_label' => __( 'Go to Portal', 'clientflow' ),
+					'cta_url'   => home_url( '/clientflow/payments' ),
+				] ),
+				[ 'Content-Type: text/html; charset=UTF-8' ]
+			);
+		}
+	}
 }

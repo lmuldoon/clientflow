@@ -101,7 +101,7 @@ export default function ProjectsApp() {
 	}
 
 	return (
-		<div style={ { maxWidth: 1100, padding: '0 0 48px' } }>
+		<div style={ { padding: '32px 28px 64px' } }>
 			{ view === 'list' ? (
 				<ProjectList onViewProject={ handleViewProject } />
 			) : (

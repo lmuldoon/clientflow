@@ -74,6 +74,7 @@ injectStyles( 'cppr-s', `
 .cppr-badge-active    { background: #EEF2FF; color: #6366F1; }
 .cppr-badge-on-hold   { background: #FFFBEB; color: #F59E0B; }
 .cppr-badge-completed { background: #ECFDF5; color: #10B981; }
+.cppr-badge-archived  { background: #F3F4F6; color: #9CA3AF; }
 
 /* Progress */
 .cppr-progress-wrap { width: 160px; }
@@ -151,24 +152,63 @@ injectStyles( 'cppr-s', `
 
 .cppr-payment-due-banner {
 	display: flex;
-	align-items: flex-start;
-	gap: 10px;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
 	margin: 18px 26px 0;
-	padding: 14px 16px;
+	padding: 14px 18px;
 	border-radius: 10px;
 	background: #FFFBEB;
 	border: 1.5px solid #FDE68A;
-	color: #92400E;
 	font-family: 'DM Sans', sans-serif;
-	font-size: 13px;
-	line-height: 1.5;
 }
-.cppr-payment-due-banner svg {
+.cppr-pdb-left {
+	display: flex;
+	align-items: center;
+	gap: 12px;
 	flex-shrink: 0;
-	margin-top: 2px;
+}
+.cppr-pdb-left svg {
+	flex-shrink: 0;
 	color: #F59E0B;
 }
-.cppr-payment-due-banner strong { font-weight: 700; }
+.cppr-pdb-label {
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
+	color: #92400E;
+	margin-bottom: 2px;
+}
+.cppr-pdb-amount {
+	font-family: 'DM Mono', monospace;
+	font-size: 20px;
+	font-weight: 700;
+	color: #78350F;
+	line-height: 1;
+}
+.cppr-pdb-pay-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 10px 20px;
+	border-radius: 6px;
+	background: #92400E;
+	color: #FFFBEB;
+	font-family: 'DM Sans', sans-serif;
+	font-size: 13px;
+	font-weight: 600;
+	text-decoration: none;
+	white-space: nowrap;
+	flex-shrink: 0;
+	transition: background .15s, transform .15s;
+}
+.cppr-pdb-pay-btn:hover {
+	background: #78350F;
+	transform: translateY(-1px);
+	color: #FFFBEB;
+	text-decoration: none;
+}
 
 .cppr-ms-approve-btn {
 	font-family: 'DM Sans', sans-serif;
@@ -386,21 +426,21 @@ injectStyles( 'cppr-s', `
 }
 
 .cppr-msg-row { display: flex; flex-direction: column; margin-bottom: 2px; }
-.cppr-msg-row.admin  { align-items: flex-start; }
-.cppr-msg-row.client { align-items: flex-end; }
 
 .cppr-msg-bubble-wrap { display: flex; align-items: flex-end; gap: 6px; }
-.cppr-msg-row.admin  .cppr-msg-bubble-wrap { flex-direction: row; }
-.cppr-msg-row.client .cppr-msg-bubble-wrap { flex-direction: row-reverse; }
+.cppr-msg-row.admin  .cppr-msg-bubble-wrap { justify-content: flex-start; }
+.cppr-msg-row.client .cppr-msg-bubble-wrap { justify-content: flex-end; }
 
 .cppr-msg-bubble {
-	max-width: 80%;
+	max-width: 88%;
+	min-width: 60px;
 	padding: 9px 13px;
 	border-radius: 14px;
 	font-family: 'DM Sans', sans-serif;
 	font-size: 13.5px;
 	line-height: 1.5;
 	word-wrap: break-word;
+	overflow-wrap: break-word;
 }
 .cppr-msg-row.admin .cppr-msg-bubble {
 	background: #F1F5F9;
@@ -420,7 +460,8 @@ injectStyles( 'cppr-s', `
 .cppr-msg-meta {
 	display: flex; align-items: center; gap: 5px; margin-top: 3px; padding: 0 2px;
 }
-.cppr-msg-row.client .cppr-msg-meta { flex-direction: row-reverse; }
+.cppr-msg-row.client .cppr-msg-meta { flex-direction: row-reverse; justify-content: flex-end; }
+.cppr-msg-row.admin  .cppr-msg-meta { justify-content: flex-start; }
 .cppr-msg-sender { font-size: 10.5px; font-weight: 600; color: #9CA3AF; }
 .cppr-msg-time   { font-size: 10.5px; color: #CBD5E1; }
 
@@ -506,7 +547,8 @@ injectStyles( 'cppr-s', `
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function badgeClass( status ) {
+function badgeClass( status, archived = false ) {
+	if ( archived ) return 'cppr-badge cppr-badge-archived';
 	return {
 		'active':    'cppr-badge cppr-badge-active',
 		'on-hold':   'cppr-badge cppr-badge-on-hold',
@@ -514,7 +556,8 @@ function badgeClass( status ) {
 	}[ status ] || 'cppr-badge cppr-badge-active';
 }
 
-function badgeLabel( status ) {
+function badgeLabel( status, archived = false ) {
+	if ( archived ) return 'Archived';
 	return { 'active': 'Active', 'on-hold': 'On Hold', 'completed': 'Completed' }[ status ] || status;
 }
 
@@ -581,6 +624,8 @@ function ProjectCard( { project } ) {
 	const msgWindowRef = { current: null };
 
 	const { apiUrl, nonce } = window.cfPortalData;
+
+	const isArchived = !! project.deleted_at;
 
 	const total     = parseInt( project.milestone_total,     10 ) || 0;
 	const completed = parseInt( project.milestone_completed, 10 ) || 0;
@@ -673,8 +718,8 @@ function ProjectCard( { project } ) {
 				</div>
 
 				<div className="cppr-card-right">
-					<span className={ badgeClass( project.status ) }>
-						{ badgeLabel( project.status ) }
+					<span className={ badgeClass( project.status, isArchived ) }>
+						{ badgeLabel( project.status, isArchived ) }
 					</span>
 
 					{ total > 0 && (
@@ -729,7 +774,7 @@ function ProjectCard( { project } ) {
 												</p>
 											) }
 										</div>
-										{ m.status === 'submitted' ? (
+										{ m.status === 'submitted' && ! isArchived ? (
 											<button
 												className="cppr-ms-approve-btn"
 												disabled={ approvingId === m.id }
@@ -751,14 +796,22 @@ function ProjectCard( { project } ) {
 
 				{ project.status === 'completed' && project.remaining_balance > 0 && (
 					<div className="cppr-payment-due-banner">
-						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-							<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-						</svg>
-						<span>
-							Project complete — a final payment of{ ' ' }
-							<strong>{ new Intl.NumberFormat( 'en-GB', { style: 'currency', currency: project.currency || 'GBP' } ).format( project.remaining_balance ) }</strong>
-							{ ' ' }is outstanding. Please contact us to arrange payment.
-						</span>
+						<div className="cppr-pdb-left">
+							<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+								<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+								<line x1="12" y1="9" x2="12" y2="13"/>
+								<line x1="12" y1="17" x2="12.01" y2="17"/>
+							</svg>
+							<div>
+								<div className="cppr-pdb-label">Final payment due</div>
+								<div className="cppr-pdb-amount">
+									{ new Intl.NumberFormat( 'en-GB', { style: 'currency', currency: project.currency || 'GBP' } ).format( project.remaining_balance ) }
+								</div>
+							</div>
+						</div>
+						<a href={ `/proposals/${ project.proposal_token }` } className="cppr-pdb-pay-btn">
+							Pay now <span aria-hidden="true">→</span>
+						</a>
 					</div>
 				) }
 
@@ -847,7 +900,7 @@ function ProjectCard( { project } ) {
 												{ approval.client_comment }
 											</div>
 										) : null
-									) : (
+									) : project.status !== 'completed' && ! isArchived ? (
 										<div className="cppr-aprv-form">
 											<textarea
 												className="cppr-aprv-comment"
@@ -883,7 +936,7 @@ function ProjectCard( { project } ) {
 												</button>
 											</div>
 										</div>
-									) }
+									) : null }
 								</div>
 							) ) }
 						</div>
@@ -957,33 +1010,35 @@ function ProjectCard( { project } ) {
 							} )
 						) }
 					</div>
-					<div className="cppr-msg-composer">
-						<textarea
-							className="cppr-msg-textarea"
-							placeholder="Send a message… (Enter to send, Shift+Enter for new line)"
-							value={ msgText }
-							onChange={ e => setMsgText( e.target.value ) }
-							onKeyDown={ handleMsgKeyDown }
-							rows={ 1 }
-							disabled={ sendingMsg }
-						/>
-						<button
-							type="button"
-							className="cppr-msg-send"
-							onClick={ handleSendMsg }
-							disabled={ ! msgText.trim() || sendingMsg }
-						>
-							{ sendingMsg ? (
-								<span className="cppr-msg-send-spinner" />
-							) : (
-								<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
-									<line x1="22" y1="2" x2="11" y2="13"/>
-									<polygon points="22 2 15 22 11 13 2 9 22 2" fill="currentColor" stroke="none"/>
-								</svg>
-							) }
-							{ ! sendingMsg && 'Send' }
-						</button>
-					</div>
+					{ ! isArchived && (
+						<div className="cppr-msg-composer">
+							<textarea
+								className="cppr-msg-textarea"
+								placeholder="Send a message… (Enter to send, Shift+Enter for new line)"
+								value={ msgText }
+								onChange={ e => setMsgText( e.target.value ) }
+								onKeyDown={ handleMsgKeyDown }
+								rows={ 1 }
+								disabled={ sendingMsg }
+							/>
+							<button
+								type="button"
+								className="cppr-msg-send"
+								onClick={ handleSendMsg }
+								disabled={ ! msgText.trim() || sendingMsg }
+							>
+								{ sendingMsg ? (
+									<span className="cppr-msg-send-spinner" />
+								) : (
+									<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+										<line x1="22" y1="2" x2="11" y2="13"/>
+										<polygon points="22 2 15 22 11 13 2 9 22 2" fill="currentColor" stroke="none"/>
+									</svg>
+								) }
+								{ ! sendingMsg && 'Send' }
+							</button>
+						</div>
+					) }
 				</div>
 
 			</div>

@@ -2,7 +2,7 @@
  * PortalSidebar
  *
  * 260px fixed sidebar. Active item: 3px indigo left-border + pale indigo bg.
- * Collapses to a bottom tab bar on mobile.
+ * Collapses to a bottom tab bar on mobile (with sign-out tab).
  *
  * Props: { page } — active page slug
  */
@@ -139,49 +139,120 @@ injectStyles( 'cps-s', `
 	flex-shrink: 0;
 }
 
-/* ── Footer ───────────────────────────────────────────── */
-.cps-footer {
-	padding: 16px 20px 24px;
-	border-top: 1px solid #EEECEA;
+/* ── Profile card ─────────────────────────────────────── */
+.cps-profile-card {
+	margin: 4px 12px 0;
+	padding: 10px 12px;
+	background: #F0F1FF;
+	border-radius: 10px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
 }
 
-.cps-client-name {
+.cps-avatar {
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	background: linear-gradient(135deg, #6366F1 0%, #818CF8 100%);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	font-family: 'DM Sans', sans-serif;
+	font-size: 12px;
+	font-weight: 700;
+	color: #fff;
+	letter-spacing: 0.04em;
+	user-select: none;
+}
+
+.cps-profile-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.cps-profile-name {
 	font-family: 'DM Sans', sans-serif;
 	font-size: 13px;
 	font-weight: 600;
-	color: #374151;
-	margin-bottom: 2px;
+	color: #1A1A2E;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	line-height: 1.3;
 }
 
-.cps-client-email {
+.cps-profile-email {
 	font-family: 'DM Sans', sans-serif;
-	font-size: 12px;
+	font-size: 11px;
 	color: #9CA3AF;
-	margin-bottom: 14px;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	margin-top: 1px;
 }
 
-.cps-logout-btn {
+.cps-signout-btn {
+	width: 28px;
+	height: 28px;
+	border-radius: 7px;
 	background: none;
 	border: none;
-	padding: 0;
-	font-family: 'DM Sans', sans-serif;
-	font-size: 13px;
-	font-weight: 500;
-	color: #9CA3AF;
 	cursor: pointer;
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	transition: color .12s;
+	justify-content: center;
+	color: #9CA3AF;
+	transition: background .15s, color .15s;
+	flex-shrink: 0;
+	padding: 0;
 }
 
-.cps-logout-btn:hover { color: #EF4444; }
+.cps-signout-btn:hover {
+	background: rgba(239, 68, 68, 0.12);
+	color: #EF4444;
+}
+
+.cps-signout-btn:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+/* ── Footer ───────────────────────────────────────────── */
+.cps-footer {
+	padding: 20px 20px 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+/* ── ClientFlow branding ──────────────────────────────── */
+.cps-cf-branding {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	text-decoration: none;
+	opacity: 0.55;
+	transition: opacity .15s;
+}
+
+.cps-cf-branding:hover { opacity: 1; }
+
+.cps-cf-branding img {
+	height: 13px;
+	width: auto;
+	flex-shrink: 0;
+}
+
+.cps-cf-branding span {
+	font-family: 'DM Sans', sans-serif;
+	font-size: 11px;
+	font-weight: 500;
+	color: #9CA3AF;
+	letter-spacing: 0.02em;
+}
 
 /* ── Mobile bottom tab bar ────────────────────────────── */
 @media (max-width: 768px) {
@@ -200,9 +271,10 @@ injectStyles( 'cps-s', `
 		z-index: 100;
 	}
 
-	.cps-brand  { display: none; }
-	.cps-divider { display: none; }
-	.cps-footer { display: none; }
+	.cps-brand      { display: none; }
+	.cps-divider    { display: none; }
+	.cps-footer     { display: none; }
+	.cps-profile-card { display: none; }
 
 	.cps-nav {
 		display: flex;
@@ -223,14 +295,49 @@ injectStyles( 'cps-s', `
 		border-radius: 8px;
 		font-size: 11px;
 		text-align: center;
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-family: 'DM Sans', sans-serif;
+		font-weight: 500;
+		color: #374151;
+		text-decoration: none;
+		transition: background .12s, color .12s;
 	}
 
 	.cps-nav-item.cps-active {
 		border-left-color: transparent;
 		background: #EEF2FF;
+		color: #6366F1;
+	}
+
+	.cps-nav-item:hover:not(.cps-active) {
+		background: #F3F4FF;
+		color: #4F46E5;
+	}
+
+	.cps-nav-item.cps-signout-tab:hover {
+		background: rgba(239, 68, 68, 0.08);
+		color: #EF4444;
+	}
+
+	.cps-nav-item.cps-signout-tab:disabled {
+		opacity: 0.6;
+		cursor: default;
 	}
 
 	.cps-nav-icon { width: 20px; height: 20px; }
+}
+
+/* Hide the mobile-only sign-out tab on desktop */
+.cps-signout-tab {
+	display: none;
+}
+
+@media (max-width: 768px) {
+	.cps-signout-tab {
+		display: flex;
+	}
 }
 ` );
 
@@ -287,14 +394,33 @@ function IconPayments( { active } ) {
 	);
 }
 
+function IconSignOut( { color = '#6B7280' } ) {
+	return (
+		<svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+			stroke={ color } strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+			<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+			<polyline points="16 17 21 12 16 7"/>
+			<line x1="21" y1="12" x2="9" y2="12"/>
+		</svg>
+	);
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function PortalSidebar( { page } ) {
-	const { businessName, businessLogo, clientData } = window.cfPortalData || {};
+	const { businessName, businessLogo, clientData, pluginUrl } = window.cfPortalData || {};
 	const [ loggingOut, setLoggingOut ] = useState( false );
 
 	const initials = ( businessName || 'CF' )
 		.split( ' ' ).slice( 0, 2 ).map( w => w[0] ).join( '' ).toUpperCase();
+
+	const cfLogoUrl = pluginUrl ? pluginUrl + 'assets/images/logo.svg' : '';
+
+	const clientName  = clientData?.name  || 'Client';
+	const clientEmail = clientData?.email || '';
+
+	const avatarInitials = clientName
+		.split( ' ' ).slice( 0, 2 ).map( w => w[0] ).join( '' ).toUpperCase() || '?';
 
 	const nav = [
 		{ slug: 'dashboard', label: 'Dashboard', Icon: IconDashboard },
@@ -307,9 +433,9 @@ export default function PortalSidebar( { page } ) {
 		setLoggingOut( true );
 		try {
 			const res = await apiFetch( '/portal/logout', { method: 'POST' } );
-			window.location.href = res.redirect_url || '/portal/login';
+			window.location.href = res.redirect_url || '/clientflow/login';
 		} catch {
-			window.location.href = '/portal/login';
+			window.location.href = '/clientflow/login';
 		}
 	}
 
@@ -334,7 +460,7 @@ export default function PortalSidebar( { page } ) {
 				{ nav.map( ( { slug, label, Icon } ) => (
 					<a
 						key={ slug }
-						href={ `/portal/${ slug }` }
+						href={ `/clientflow/${ slug }` }
 						className={ `cps-nav-item${ page === slug ? ' cps-active' : '' }` }
 					>
 						<span className="cps-nav-icon">
@@ -343,29 +469,54 @@ export default function PortalSidebar( { page } ) {
 						{ label }
 					</a>
 				) ) }
-			</nav>
 
-			{ /* ── Footer ── */ }
-			<div className="cps-footer">
-				{ clientData && (
-					<>
-						<p className="cps-client-name">{ clientData.name || 'Client' }</p>
-						<p className="cps-client-email">{ clientData.email }</p>
-					</>
-				) }
+				{ /* Mobile-only sign-out tab */ }
 				<button
-					className="cps-logout-btn"
+					className="cps-nav-item cps-signout-tab"
 					onClick={ handleLogout }
 					disabled={ loggingOut }
 				>
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-						stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-						<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
-						<polyline points="16 17 21 12 16 7"/>
-						<line x1="21" y1="12" x2="9" y2="12"/>
-					</svg>
-					{ loggingOut ? 'Signing out…' : 'Sign out' }
+					<span className="cps-nav-icon">
+						<IconSignOut color={ loggingOut ? '#9CA3AF' : '#6B7280' } />
+					</span>
+					{ loggingOut ? '…' : 'Sign out' }
 				</button>
+			</nav>
+
+			{ /* ── Profile card (desktop) ── */ }
+			{ clientData && (
+				<div className="cps-profile-card">
+					<div className="cps-avatar">{ avatarInitials }</div>
+					<div className="cps-profile-info">
+						<div className="cps-profile-name">{ clientName }</div>
+						{ clientEmail && (
+							<div className="cps-profile-email">{ clientEmail }</div>
+						) }
+					</div>
+					<button
+						className="cps-signout-btn"
+						onClick={ handleLogout }
+						disabled={ loggingOut }
+						title="Sign out"
+					>
+						<IconSignOut color="currentColor" />
+					</button>
+				</div>
+			) }
+
+			{ /* ── Footer ── */ }
+			<div className="cps-footer">
+				{ cfLogoUrl && (
+					<a
+						href="https://wpclientflow.io"
+						className="cps-cf-branding"
+						target="_blank"
+						rel="noopener noreferrer"
+					>
+						<span>Powered by</span>
+						<img src={ cfLogoUrl } alt="ClientFlow" />
+					</a>
+				) }
 			</div>
 
 		</aside>

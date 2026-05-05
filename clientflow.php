@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-define( 'CLIENTFLOW_VERSION',    '0.1.0' );
+define( 'CLIENTFLOW_VERSION',    '0.1.1' );
 define( 'CLIENTFLOW_DB_VERSION', '7' );
 define( 'CLIENTFLOW_DIR',        plugin_dir_path( __FILE__ ) );
 define( 'CLIENTFLOW_URL',        plugin_dir_url( __FILE__ ) );
@@ -122,6 +122,22 @@ function cf_email_html( array $args ): string {
 	$greeting      = $name ? "Hi {$name}," : 'Hi there,';
 	$body          = $args['body'] ?? '';
 
+	$brand_color   = get_option( 'clientflow_brand_color', '#6366F1' );
+	$logo_url      = get_option( 'clientflow_logo_url', '' );
+	$cf_logo_url   = CLIENTFLOW_URL . 'assets/images/logo.png';
+
+	$logo_html = '';
+	if ( $logo_url ) {
+		$safe_logo = esc_url( $logo_url );
+		$logo_html = "
+          <tr>
+            <td style=\"padding-bottom:16px;\">
+              <img src=\"{$safe_logo}\" alt=\"{$business_name}\"
+                   style=\"max-height:48px;max-width:180px;object-fit:contain;display:block;\">
+            </td>
+          </tr>";
+	}
+
 	$cta_html = '';
 	if ( ! empty( $args['cta_label'] ) && ! empty( $args['cta_url'] ) ) {
 		$label    = esc_html( $args['cta_label'] );
@@ -130,7 +146,7 @@ function cf_email_html( array $args ): string {
           <tr>
             <td style=\"padding-bottom:36px;text-align:center;\">
               <a href=\"{$href}\"
-                 style=\"display:inline-block;padding:16px 40px;background:#6366F1;
+                 style=\"display:inline-block;padding:16px 40px;background:{$brand_color};
                          color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;
                          border-radius:12px;letter-spacing:0.01em;\">
                 {$label}
@@ -163,6 +179,7 @@ function cf_email_html( array $args ): string {
         <table width="520" cellpadding="0" cellspacing="0"
                style="background:#ffffff;border-radius:20px;padding:48px 44px;
                       box-shadow:0 2px 4px rgba(26,26,46,.04),0 12px 40px rgba(26,26,46,.09);">
+          {$logo_html}
           <tr>
             <td style="padding-bottom:32px;border-bottom:1px solid #F3F4F6;">
               <p style="margin:0;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;
@@ -184,6 +201,19 @@ function cf_email_html( array $args ): string {
           </tr>
           {$cta_html}
           {$footer_html}
+        </table>
+        <table width="520" cellpadding="0" cellspacing="0" style="margin-top:24px;">
+          <tr>
+            <td align="center" style="padding-bottom:32px;">
+              <a href="https://wpclientflow.io"
+                 style="text-decoration:none;display:inline-flex;align-items:center;gap:7px;vertical-align:middle;">
+                <span style="font-family:'DM Sans',Helvetica,Arial,sans-serif;font-size:11px;
+                             color:#9CA3AF;vertical-align:middle;letter-spacing:0.02em;">Powered by</span>
+                <img src="{$cf_logo_url}" alt="ClientFlow"
+                     style="display:inline-block;vertical-align:middle;border:0;height:14px;width:auto;">
+              </a>
+            </td>
+          </tr>
         </table>
       </td>
     </tr>
@@ -282,7 +312,7 @@ final class ClientFlow {
 		add_action( 'admin_init', static function (): void {
 			if ( ! defined( 'DOING_AJAX' ) || ! DOING_AJAX ) {
 				if ( ClientFlow_Portal_Auth::is_authenticated() ) {
-					wp_safe_redirect( home_url( '/portal/dashboard' ) );
+					wp_safe_redirect( home_url( '/clientflow/dashboard' ) );
 					exit;
 				}
 			}
@@ -299,7 +329,7 @@ final class ClientFlow {
 		// After WP login, send clients to the portal dashboard instead of WP admin.
 		add_filter( 'login_redirect', static function ( string $redirect_to, string $_requested_redirect_to, $user ): string {
 			if ( $user instanceof WP_User && in_array( 'clientflow_client', (array) $user->roles, true ) ) {
-				return home_url( '/portal/dashboard' );
+				return home_url( '/clientflow/dashboard' );
 			}
 			return $redirect_to;
 		}, 10, 3 );
@@ -761,12 +791,12 @@ function clientflow_activate(): void {
 	add_rewrite_tag( '%cf_portal_page%', '([a-z]+)' );
 	foreach ( [ 'login', 'verify', 'dashboard', 'proposals', 'payments', 'projects' ] as $portal_page ) {
 		add_rewrite_rule(
-			"^portal/{$portal_page}/?$",
+			"^clientflow/{$portal_page}/?$",
 			"index.php?cf_portal_page={$portal_page}",
 			'top'
 		);
 	}
-	add_rewrite_rule( '^portal/?$', 'index.php?cf_portal_page=login', 'top' );
+	add_rewrite_rule( '^clientflow/?$', 'index.php?cf_portal_page=login', 'top' );
 
 	flush_rewrite_rules();
 

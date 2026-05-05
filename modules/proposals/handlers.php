@@ -76,9 +76,11 @@ class ClientFlow_Proposal_Handlers {
 		// Merge template default sections with wizard pricing data.
 		$default_content = json_decode( ClientFlow_Proposal_Template::default_content( $template_id ), true ) ?: [];
 		$content         = array_merge( $default_content, [
-			'line_items'   => self::sanitize_line_items( $line_items ),
-			'discount_pct' => $discount_pct,
-			'vat_pct'      => $vat_pct,
+			'line_items'      => self::sanitize_line_items( $line_items ),
+			'discount_pct'    => $discount_pct,
+			'vat_pct'         => $vat_pct,
+			'deposit_pct'     => (int) ( $payload['deposit_pct']    ?? 0 ),
+			'require_deposit' => ! empty( $payload['require_deposit'] ),
 		] );
 
 		// ── Expiry date ──────────────────────────────────────────────────────
@@ -231,6 +233,18 @@ class ClientFlow_Proposal_Handlers {
 	public static function expire_overdue(): int {
 		global $wpdb;
 
+		// Sync any proposals whose linked project is completed but proposal status wasn't updated.
+		$wpdb->query(
+			"UPDATE {$wpdb->prefix}clientflow_proposals p
+			 INNER JOIN {$wpdb->prefix}clientflow_projects pr ON pr.proposal_id = p.id
+			 SET p.status = 'completed'
+			 WHERE pr.status = 'completed'
+			   AND p.status NOT IN ('completed', 'expired')"
+		);
+
+		// Send warning emails to clients whose proposals expire within 3 days.
+		self::send_expiry_warnings();
+
 		$result = $wpdb->query(
 			$wpdb->prepare(
 				"UPDATE {$wpdb->prefix}clientflow_proposals
@@ -244,6 +258,59 @@ class ClientFlow_Proposal_Handlers {
 		);
 
 		return (int) $result;
+	}
+
+	/**
+	 * Email clients whose proposals expire within 3 days. Sends at most once per proposal.
+	 */
+	private static function send_expiry_warnings(): void {
+		global $wpdb;
+
+		$expiring = $wpdb->get_results(
+			"SELECT p.id, p.title, p.token, p.expiry_date, p.client_id
+			 FROM {$wpdb->prefix}clientflow_proposals p
+			 WHERE p.status IN ('sent','viewed')
+			   AND p.expiry_date IS NOT NULL
+			   AND p.expiry_date > NOW()
+			   AND p.expiry_date <= DATE_ADD(NOW(), INTERVAL 3 DAY)
+			   AND p.deleted_at IS NULL"
+		);
+
+		foreach ( $expiring as $proposal ) {
+			$flag_key = 'cf_expiry_warned_' . $proposal->id;
+			if ( get_option( $flag_key ) ) {
+				continue;
+			}
+
+			$client = get_userdata( (int) $proposal->client_id );
+			if ( ! $client ) {
+				continue;
+			}
+
+			$days    = max( 1, (int) ceil( ( strtotime( $proposal->expiry_date ) - time() ) / DAY_IN_SECONDS ) );
+			$day_str = $days === 1 ? __( '1 day', 'clientflow' ) : sprintf( __( '%d days', 'clientflow' ), $days );
+
+			wp_mail(
+				$client->user_email,
+				sprintf( __( 'Your proposal expires in %s', 'clientflow' ), $day_str ),
+				cf_email_html( [
+					'name'      => $client->display_name,
+					'body'      => '<p style="margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;">Your proposal <em>' . esc_html( $proposal->title ) . '</em> will expire in <strong style="color:#1A1A2E;">' . esc_html( $day_str ) . '</strong>. Please review and respond before it expires.</p>',
+					'cta_label' => __( 'Review Proposal', 'clientflow' ),
+					'cta_url'   => home_url( '/proposals/' . $proposal->token ),
+				] ),
+				[ 'Content-Type: text/html; charset=UTF-8' ]
+			);
+
+			update_option( $flag_key, '1', false );
+		}
+	}
+
+	/**
+	 * Clear the expiry warning flag for a proposal (call on delete or manual expire).
+	 */
+	public static function clear_expiry_warning( int $proposal_id ): void {
+		delete_option( 'cf_expiry_warned_' . $proposal_id );
 	}
 
 	// ── Private Helpers ───────────────────────────────────────────────────────

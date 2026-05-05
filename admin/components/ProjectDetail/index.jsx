@@ -578,6 +578,72 @@ const CSS = `
 .cf-pd-info-val a { color: var(--cf-indigo); text-decoration: none; }
 .cf-pd-info-val a:hover { text-decoration: underline; }
 
+.cf-pd-payment-card {
+  background: var(--cf-white);
+  border: 1px solid var(--cf-slate-200);
+  border-radius: var(--cf-radius);
+  overflow: hidden;
+  margin-top: 12px;
+}
+.cf-pd-payment-body {
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cf-pd-payment-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.cf-pd-payment-row--pending { opacity: .7; }
+.cf-pd-payment-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cf-slate-500);
+  text-transform: uppercase;
+  letter-spacing: .6px;
+}
+.cf-pd-payment-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  padding: 1px 6px;
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+.cf-pd-payment-badge--paid    { background: #D1FAE5; color: #065F46; }
+.cf-pd-payment-badge--pending { background: #FEF3C7; color: #92400E; }
+.cf-pd-payment-amount {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--cf-navy);
+  font-variant-numeric: tabular-nums;
+}
+.cf-pd-payment-date {
+  font-size: 11px;
+  color: var(--cf-slate-400);
+}
+.cf-pd-payment-none {
+  font-size: 12px;
+  color: var(--cf-slate-400);
+}
+.cf-pd-payment-balance {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid var(--cf-slate-100);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cf-slate-500);
+}
+.cf-pd-balance--due   { color: #D97706; font-weight: 700; }
+.cf-pd-balance--clear { color: #059669; font-weight: 700; }
+
 .cf-pd-delete-project {
   width: 100%;
   margin-top: 12px;
@@ -655,6 +721,7 @@ export default function ProjectDetail( { projectId, onBack } ) {
 	const [ justCompleted,   setJustCompleted   ] = useState( null );
 	const [ tabsVisited,     setTabsVisited     ] = useState( { overview: true, files: false, approvals: false, messages: false } );
 	const [ messagesUnread,  setMessagesUnread  ] = useState( 0 );
+	const [ paymentData,     setPaymentData     ] = useState( null );
 
 	const dragItem = useRef( null );
 	const dragOver = useRef( null );
@@ -662,15 +729,15 @@ export default function ProjectDetail( { projectId, onBack } ) {
 	const load = useCallback( async () => {
 		setLoading( true );
 		try {
-			const [ projectData, msgData ] = await Promise.all( [
+			const [ projectData, msgData, pmtData ] = await Promise.all( [
 				cfFetch( `projects/${ projectId }` ),
 				cfFetch( `messages/unread-count` ).catch( () => ( { count: 0 } ) ),
+				cfFetch( `projects/${ projectId }/payments` ).catch( () => null ),
 			] );
 			setProject( projectData.project );
 			setNotes( projectData.project.description || '' );
-			// Unread count scoped to this project requires the messages list endpoint,
-			// but we use the global count here as a fast badge — refined on tab open.
 			setMessagesUnread( msgData.count || 0 );
+			setPaymentData( pmtData );
 		} catch {}
 		finally { setLoading( false ); }
 	}, [ projectId ] );
@@ -827,6 +894,11 @@ export default function ProjectDetail( { projectId, onBack } ) {
 	const completed  = project.milestone_completed || 0;
 	const pct        = project.progress_pct        || 0;
 
+	// Project is locked once completed and fully paid (or no payment required).
+	const isLocked = project.status === 'completed' && paymentData !== null && (
+		paymentData.remaining === null || paymentData.remaining <= 0
+	);
+
 	// ── Render ───────────────────────────────────────────────────────────
 
 	return (
@@ -854,21 +926,27 @@ export default function ProjectDetail( { projectId, onBack } ) {
 						) }
 					</div>
 				</div>
-				<select
-					className={ `cf-pd-status-select ${ statusClass( project.status ) }` }
-					value={ project.status }
-					onChange={ handleStatusChange }
-				>
-					<option value="active">Active</option>
-					<option value="on-hold">On Hold</option>
-					<option
-						value="completed"
-						disabled={ total > 0 && completed < total }
-						title={ total > 0 && completed < total ? `${ total - completed } milestone${ total - completed !== 1 ? 's' : '' } still incomplete` : undefined }
+				{ isLocked ? (
+					<span className="cf-pd-status-select cf-pd-status-completed" style={{ cursor: 'default', pointerEvents: 'none' }}>
+						Completed
+					</span>
+				) : (
+					<select
+						className={ `cf-pd-status-select ${ statusClass( project.status ) }` }
+						value={ project.status }
+						onChange={ handleStatusChange }
 					>
-						{ total > 0 && completed < total ? `Completed (${ total - completed } pending)` : 'Completed' }
-					</option>
-				</select>
+						<option value="active">Active</option>
+						<option value="on-hold">On Hold</option>
+						<option
+							value="completed"
+							disabled={ total > 0 && completed < total }
+							title={ total > 0 && completed < total ? `${ total - completed } milestone${ total - completed !== 1 ? 's' : '' } still incomplete` : undefined }
+						>
+							{ total > 0 && completed < total ? `Completed (${ total - completed } pending)` : 'Completed' }
+						</option>
+					</select>
+				) }
 			</div>
 
 			{ /* ── Tab bar ── */ }
@@ -939,23 +1017,25 @@ export default function ProjectDetail( { projectId, onBack } ) {
 
 						{ /* Add form */ }
 						<p className="cf-pd-section-label">Milestones</p>
-						<form className="cf-pd-add-form" onSubmit={ handleAddMilestone }>
-							<input
-								className="cf-pd-add-input"
-								placeholder="Add a milestone…"
-								value={ newTitle }
-								onChange={ e => setNewTitle( e.target.value ) }
-							/>
-							<input
-								type="date"
-								className="cf-pd-add-date"
-								value={ newDue }
-								onChange={ e => setNewDue( e.target.value ) }
-							/>
-							<button type="submit" className="cf-pd-add-btn" disabled={ adding || ! newTitle.trim() }>
-								{ adding ? '…' : '+ Add' }
-							</button>
-						</form>
+						{ ! isLocked && (
+							<form className="cf-pd-add-form" onSubmit={ handleAddMilestone }>
+								<input
+									className="cf-pd-add-input"
+									placeholder="Add a milestone…"
+									value={ newTitle }
+									onChange={ e => setNewTitle( e.target.value ) }
+								/>
+								<input
+									type="date"
+									className="cf-pd-add-date"
+									value={ newDue }
+									onChange={ e => setNewDue( e.target.value ) }
+								/>
+								<button type="submit" className="cf-pd-add-btn" disabled={ adding || ! newTitle.trim() }>
+									{ adding ? '…' : '+ Add' }
+								</button>
+							</form>
+						) }
 
 						{ /* Milestone list */ }
 						<div className="cf-pd-ms-list">
@@ -974,7 +1054,14 @@ export default function ProjectDetail( { projectId, onBack } ) {
 									>
 										<div className="cf-pd-ms-drag"><span/><span/><span/></div>
 
-										{ m.status === 'pending' ? (
+										{ isLocked ? (
+											<button
+												className="cf-pd-ms-btn locked"
+												data-status={ m.status }
+												disabled
+												title="Project is complete and locked"
+											/>
+										) : m.status === 'pending' ? (
 											<button
 												className="cf-pd-ms-submit-btn"
 												onClick={ () => handleSubmitMilestone( m ) }
@@ -1008,15 +1095,17 @@ export default function ProjectDetail( { projectId, onBack } ) {
 											</span>
 										) }
 
-										<button
-											className="cf-pd-ms-del"
-											onClick={ () => handleDeleteMilestone( m.id ) }
-											title="Delete milestone"
-										>
-											<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-												<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-											</svg>
-										</button>
+										{ ! isLocked && (
+											<button
+												className="cf-pd-ms-del"
+												onClick={ () => handleDeleteMilestone( m.id ) }
+												title="Delete milestone"
+											>
+												<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+													<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+												</svg>
+											</button>
+										) }
 									</div>
 								) )
 							) }
@@ -1030,13 +1119,17 @@ export default function ProjectDetail( { projectId, onBack } ) {
 								placeholder="Add private notes about this project…"
 								value={ notes }
 								onChange={ e => setNotes( e.target.value ) }
+								readOnly={ isLocked }
+								style={ isLocked ? { opacity: 0.6, cursor: 'default' } : undefined }
 							/>
-							<div className="cf-pd-notes-foot">
-								<button className="cf-pd-notes-save" onClick={ handleSaveNotes } disabled={ savingNotes }>
-									{ savingNotes ? 'Saving…' : 'Save Notes' }
-								</button>
-								{ notesSaved && <span className="cf-pd-notes-saved-tag">✓ Saved</span> }
-							</div>
+							{ ! isLocked && (
+								<div className="cf-pd-notes-foot">
+									<button className="cf-pd-notes-save" onClick={ handleSaveNotes } disabled={ savingNotes }>
+										{ savingNotes ? 'Saving…' : 'Save Notes' }
+									</button>
+									{ notesSaved && <span className="cf-pd-notes-saved-tag">✓ Saved</span> }
+								</div>
+							) }
 						</div>
 					</div>
 
@@ -1053,7 +1146,7 @@ export default function ProjectDetail( { projectId, onBack } ) {
 						role="tabpanel"
 						className={ `cf-pd-tab-panel${ activeTab === 'approvals' ? ' cf-pd-tab-active' : '' }` }
 					>
-						{ tabsVisited.approvals && <ProjectApprovals projectId={ projectId } /> }
+						{ tabsVisited.approvals && <ProjectApprovals projectId={ projectId } isLocked={ isLocked } /> }
 					</div>
 
 					{ /* Messages panel */ }
@@ -1110,6 +1203,48 @@ export default function ProjectDetail( { projectId, onBack } ) {
 							</div>
 						</div>
 					</div>
+
+				{ paymentData && paymentData.proposal_total !== null && (
+					<div className="cf-pd-payment-card">
+						<div className="cf-pd-info-head">Payment</div>
+						<div className="cf-pd-payment-body">
+							{ paymentData.payments.filter( p => p.status === 'completed' ).map( p => (
+								<div key={ p.id } className="cf-pd-payment-row">
+									<div className="cf-pd-payment-label">
+										{ p.deposit_pct < 100 ? `Deposit (${ p.deposit_pct }%)` : 'Full payment' }
+										<span className="cf-pd-payment-badge cf-pd-payment-badge--paid">Paid</span>
+									</div>
+									<div className="cf-pd-payment-amount">
+										{ new Intl.NumberFormat( undefined, { style: 'currency', currency: p.currency || 'GBP' } ).format( p.amount ) }
+									</div>
+									{ p.completed_at && (
+										<div className="cf-pd-payment-date">{ formatDate( p.completed_at ) }</div>
+									) }
+								</div>
+							) ) }
+							{ paymentData.payments.filter( p => p.status === 'pending' || p.status === 'processing' ).map( p => (
+								<div key={ p.id } className="cf-pd-payment-row cf-pd-payment-row--pending">
+									<div className="cf-pd-payment-label">
+										{ p.deposit_pct < 100 ? `Deposit (${ p.deposit_pct }%)` : 'Full payment' }
+										<span className="cf-pd-payment-badge cf-pd-payment-badge--pending">Pending</span>
+									</div>
+									<div className="cf-pd-payment-amount">
+										{ new Intl.NumberFormat( undefined, { style: 'currency', currency: p.currency || 'GBP' } ).format( p.amount ) }
+									</div>
+								</div>
+							) ) }
+							{ paymentData.payments.length === 0 && (
+								<div className="cf-pd-payment-none">No payments recorded</div>
+							) }
+							<div className="cf-pd-payment-balance">
+								<span>Balance remaining</span>
+								<span className={ ( paymentData.remaining ?? paymentData.proposal_total ) > 0 ? 'cf-pd-balance--due' : 'cf-pd-balance--clear' }>
+									{ new Intl.NumberFormat( undefined, { style: 'currency', currency: paymentData.payments[0]?.currency || 'GBP' } ).format( paymentData.remaining ?? paymentData.proposal_total ) }
+								</span>
+							</div>
+						</div>
+					</div>
+				) }
 
 					<button className="cf-pd-delete-project" onClick={ handleDeleteProject }>
 						Delete Project

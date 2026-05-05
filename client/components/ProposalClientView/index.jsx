@@ -90,6 +90,47 @@ const PAGE_CSS = `
 	to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Expiry banners ─────────────────────────────────────────── */
+.cfv-expiry-banner {
+	max-width: 780px;
+	margin: 0 auto 0;
+	padding: 0 0 12px;
+}
+
+.cfv-expiry-banner__inner {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 16px 20px;
+	border-radius: 10px;
+	font-family: 'DM Sans', sans-serif;
+	font-size: 14px;
+	line-height: 1.55;
+}
+
+.cfv-expiry-banner--expired .cfv-expiry-banner__inner {
+	background: #FEF2F2;
+	border: 1px solid #FECACA;
+	color: #991B1B;
+}
+
+.cfv-expiry-banner--warning .cfv-expiry-banner__inner {
+	background: #FFFBEB;
+	border: 1px solid #FDE68A;
+	color: #92400E;
+}
+
+.cfv-expiry-banner__icon {
+	flex-shrink: 0;
+	margin-top: 1px;
+}
+
+.cfv-expiry-banner__text strong {
+	display: block;
+	font-weight: 600;
+	margin-bottom: 2px;
+}
+
 /* ── Divider ─────────────────────────────────────────────────── */
 .cfv-divider {
 	height: 1px;
@@ -391,6 +432,12 @@ export default function ProposalClientView() {
 	const sections  = content.sections   || [];
 	const lineItems = content.line_items || [];
 
+	const isExpired    = proposal.status === 'expired';
+	const daysUntilExpiry = proposal.expiry_date
+		? Math.ceil( ( new Date( proposal.expiry_date ) - Date.now() ) / 86400000 )
+		: null;
+	const showWarning = ! isExpired && daysUntilExpiry !== null && daysUntilExpiry <= 7 && daysUntilExpiry >= 0;
+
 	return (
 		<div className="cfv-page">
 			<div className="cfv-doc">
@@ -420,16 +467,51 @@ export default function ProposalClientView() {
 				</div>
 			</div>
 
-			<ClientActionButtons
-				status={ proposal.status }
-				paymentEnabled={ proposal.payment_enabled }
-				hasPaid={ !! proposal.has_paid }
-				ownerEmail={ proposal.owner_email }
-				onAccept={ handleAccept }
-				onDecline={ handleDecline }
-				onPayment={ () => setShowPayment( true ) }
-				loading={ actionLoading }
-			/>
+			{ isExpired && (
+				<div className="cfv-expiry-banner cfv-expiry-banner--expired">
+					<div className="cfv-expiry-banner__inner">
+						<span className="cfv-expiry-banner__icon">
+							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+								<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+							</svg>
+						</span>
+						<div className="cfv-expiry-banner__text">
+							<strong>This proposal has expired</strong>
+							Please contact us to discuss next steps.
+						</div>
+					</div>
+				</div>
+			) }
+
+			{ showWarning && (
+				<div className="cfv-expiry-banner cfv-expiry-banner--warning">
+					<div className="cfv-expiry-banner__inner">
+						<span className="cfv-expiry-banner__icon">
+							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+								<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+							</svg>
+						</span>
+						<div className="cfv-expiry-banner__text">
+							<strong>This proposal expires { daysUntilExpiry === 0 ? 'today' : `in ${ daysUntilExpiry } day${ daysUntilExpiry === 1 ? '' : 's' }` }</strong>
+							{ proposal.expiry_date && `Expires on ${ new Date( proposal.expiry_date ).toLocaleDateString( 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' } ) }.` }
+						</div>
+					</div>
+				</div>
+			) }
+
+			{ ! isExpired && (
+				<ClientActionButtons
+					status={ proposal.status }
+					paymentEnabled={ proposal.payment_enabled }
+					hasPaid={ !! proposal.has_paid }
+					remainingBalance={ parseFloat( proposal.remaining_balance || 0 ) }
+					ownerEmail={ proposal.owner_email }
+					onAccept={ handleAccept }
+					onDecline={ handleDecline }
+					onPayment={ () => setShowPayment( true ) }
+					loading={ actionLoading }
+				/>
+			) }
 
 			{ showPayment && (
 				<PaymentModal

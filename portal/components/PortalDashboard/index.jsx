@@ -75,7 +75,7 @@ injectStyles( 'cpd-s', `
 /* ── Stats row ────────────────────────────────────────── */
 .cpd-stats {
 	display: grid;
-	grid-template-columns: repeat(3, 1fr);
+	grid-template-columns: repeat(5, 1fr);
 	gap: 18px;
 	margin-bottom: 44px;
 }
@@ -221,8 +221,22 @@ injectStyles( 'cpd-s', `
 	100% { background-position: -200% 0; }
 }
 
+/* ── Stat card variants ───────────────────────────────── */
+.cpd-stat-card--due {
+	background: #FFFBEB;
+	border-color: #FDE68A;
+}
+.cpd-stat-card--due .cpd-stat-label { color: #92400E; }
+.cpd-stat-card--due .cpd-stat-num   { color: #78350F; }
+
+.cpd-stat-card--complete .cpd-stat-label { color: #065F46; }
+.cpd-stat-card--complete .cpd-stat-num   { color: #059669; }
+
 /* ── Responsive ───────────────────────────────────────── */
-@media (max-width: 900px) {
+@media (max-width: 1200px) {
+	.cpd-stats { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 950px) {
 	.cpd-stats { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 600px) {
@@ -237,16 +251,19 @@ export default function PortalDashboard() {
 	const [ client,    setClient    ] = useState( null );
 	const [ proposals, setProposals ] = useState( [] );
 	const [ payments,  setPayments  ] = useState( [] );
+	const [ projects,  setProjects  ] = useState( [] );
 
 	useEffect( () => {
 		Promise.all( [
 			apiFetch( '/portal/me' ),
 			apiFetch( '/portal/proposals' ),
 			apiFetch( '/portal/payments' ),
-		] ).then( ( [ me, props, pays ] ) => {
+			apiFetch( '/portal/projects' ).catch( () => [] ),
+		] ).then( ( [ me, props, pays, projs ] ) => {
 			setClient( me );
-			setProposals( Array.isArray( props ) ? props : [] );
-			setPayments(  Array.isArray( pays  ) ? pays  : [] );
+			setProposals( Array.isArray( props  ) ? props  : [] );
+			setPayments(  Array.isArray( pays   ) ? pays   : [] );
+			setProjects(  Array.isArray( projs?.projects ) ? projs.projects : [] );
 			setLoading( false );
 		} ).catch( () => setLoading( false ) );
 	}, [] );
@@ -258,7 +275,12 @@ export default function PortalDashboard() {
 	const totalPaid      = payments
 		.filter( p => p.status === 'completed' )
 		.reduce( ( sum, p ) => sum + parseFloat( p.amount || 0 ), 0 );
-	const currency       = payments[0]?.currency || 'GBP';
+	const currency       = payments[0]?.currency || projects[0]?.currency || 'GBP';
+
+	const completedCount = projects.filter( p => p.status === 'completed' ).length;
+	const amountDue      = projects
+		.filter( p => p.status === 'completed' && parseFloat( p.remaining_balance ) > 0 )
+		.reduce( ( sum, p ) => sum + parseFloat( p.remaining_balance || 0 ), 0 );
 
 	const firstName = ( client?.name || '' ).split( ' ' )[0] || 'there';
 
@@ -280,7 +302,7 @@ export default function PortalDashboard() {
 					<div className="cpd-skel" style={{ height: 18, width: 320 }} />
 				</div>
 				<div className="cpd-stats">
-					{ [1,2,3].map( i => (
+					{ [1,2,3,4,5].map( i => (
 						<div key={ i } className="cpd-stat-card">
 							<div className="cpd-skel" style={{ height: 30, width: 80, marginBottom: 8 }} />
 							<div className="cpd-skel" style={{ height: 14, width: 120 }} />
@@ -307,12 +329,22 @@ export default function PortalDashboard() {
 					<p className="cpd-stat-label">Active Proposals</p>
 				</div>
 				<div className="cpd-stat-card">
+					<p className="cpd-stat-num">{ inProgress }</p>
+					<p className="cpd-stat-label">In Progress</p>
+				</div>
+				<div className={ `cpd-stat-card${ completedCount > 0 ? ' cpd-stat-card--complete' : '' }` }>
+					<p className="cpd-stat-num">{ completedCount }</p>
+					<p className="cpd-stat-label">Completed</p>
+				</div>
+				<div className="cpd-stat-card">
 					<p className="cpd-stat-num">{ fmt( totalPaid, currency ) }</p>
 					<p className="cpd-stat-label">Total Paid</p>
 				</div>
-				<div className="cpd-stat-card">
-					<p className="cpd-stat-num">{ inProgress }</p>
-					<p className="cpd-stat-label">In Progress</p>
+				<div className={ `cpd-stat-card${ amountDue > 0 ? ' cpd-stat-card--due' : '' }` }>
+					<p className="cpd-stat-num">
+						{ amountDue > 0 ? fmt( amountDue, currency ) : '—' }
+					</p>
+					<p className="cpd-stat-label">Amount Due</p>
 				</div>
 			</div>
 
@@ -368,7 +400,7 @@ export default function PortalDashboard() {
 			) }
 
 			{ proposals.length > 5 && (
-				<a className="cpd-view-all" href="/portal/proposals">
+				<a className="cpd-view-all" href="/clientflow/proposals">
 					View all proposals
 					<svg width="14" height="14" viewBox="0 0 24 24" fill="none"
 						stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -414,7 +446,7 @@ export default function PortalDashboard() {
 						</table>
 					</div>
 					{ payments.length > 5 && (
-						<a className="cpd-view-all" href="/portal/payments">
+						<a className="cpd-view-all" href="/clientflow/payments">
 							View payment history
 							<svg width="14" height="14" viewBox="0 0 24 24" fill="none"
 								stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

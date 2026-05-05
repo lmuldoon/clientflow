@@ -320,6 +320,18 @@ const CSS = `
 .cf-pa-empty h4 { font-size: 14.5px; font-weight: 700; color: var(--cf-slate-600); margin: 0; }
 .cf-pa-empty p  { font-size: 13px; color: var(--cf-slate-400); margin: 0; }
 
+/* ── Locked note ───────────────────────────────────────────────── */
+.cf-pa-locked-note {
+	margin: 0 0 16px;
+	padding: 9px 13px;
+	background: var(--cf-slate-50);
+	border: 1px solid var(--cf-slate-200);
+	border-radius: var(--cf-radius-sm);
+	font-size: 12.5px;
+	color: var(--cf-slate-500);
+	font-style: italic;
+}
+
 /* ── Error ─────────────────────────────────────────────────────── */
 .cf-pa-error {
 	display: flex;
@@ -371,7 +383,7 @@ function formatDate( dateStr ) {
 	}
 }
 
-export default function ProjectApprovals( { projectId } ) {
+export default function ProjectApprovals( { projectId, isLocked = false } ) {
 	injectStyles( 'cf-pa-styles', CSS );
 
 	const [ approvals,   setApprovals  ] = useState( [] );
@@ -429,7 +441,7 @@ export default function ProjectApprovals( { projectId } ) {
 					</svg>
 				</div>
 				<span className="cf-pa-title">Approvals</span>
-				{ ! showForm && (
+				{ ! isLocked && ! showForm && (
 					<button type="button" className="cf-pa-new-btn" onClick={ () => setShowForm( true ) }>
 						<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
 							<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -448,7 +460,13 @@ export default function ProjectApprovals( { projectId } ) {
 				</div>
 			) }
 
-			{ showForm && (
+			{ isLocked && approvals.length > 0 && (
+				<p className="cf-pa-locked-note">
+					This project is complete — approvals are read-only.
+				</p>
+			) }
+
+			{ ! isLocked && showForm && (
 				<form className="cf-pa-form" onSubmit={ handleCreate }>
 					<div className="cf-pa-form-title">New Approval Request</div>
 					<div className="cf-pa-form-row">
@@ -537,19 +555,21 @@ export default function ProjectApprovals( { projectId } ) {
 								) }
 							</div>
 
-							<button
-								type="button"
-								className="cf-pa-card-delete"
-								title="Delete request"
-								onClick={ () => handleDelete( approval.id ) }
-								aria-label="Delete approval request"
-							>
-								<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
-									<polyline points="3 6 5 6 21 6"/>
-									<path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-									<path d="M10 11v6M14 11v6"/>
-								</svg>
-							</button>
+							{ ! isLocked && (
+								<button
+									type="button"
+									className="cf-pa-card-delete"
+									title="Delete request"
+									onClick={ () => handleDelete( approval.id ) }
+									aria-label="Delete approval request"
+								>
+									<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+										<polyline points="3 6 5 6 21 6"/>
+										<path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+										<path d="M10 11v6M14 11v6"/>
+									</svg>
+								</button>
+							) }
 						</div>
 					) ) }
 				</div>

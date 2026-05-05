@@ -307,6 +307,79 @@ injectStyles( 'cpl-s', `
 	animation: cpl-fade-up .5s ease .3s both;
 }
 
+/* ── Tabs ────────────────────────────────────────────────── */
+.cpl-tabs {
+	display: flex;
+	gap: 6px;
+	background: #F3F4F6;
+	border-radius: 10px;
+	padding: 4px;
+	margin-bottom: 28px;
+}
+
+.cpl-tab {
+	flex: 1;
+	height: 36px;
+	border: none;
+	border-radius: 7px;
+	font-family: 'DM Sans', sans-serif;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background .15s, color .15s, box-shadow .15s;
+	background: transparent;
+	color: #9CA3AF;
+}
+
+.cpl-tab--active {
+	background: #6366F1;
+	color: #fff;
+	box-shadow: 0 2px 8px rgba(99,102,241,.3);
+}
+
+.cpl-tab:not(.cpl-tab--active):hover { color: #6366F1; }
+
+/* ── Password input wrapper ──────────────────────────────── */
+.cpl-input-wrap {
+	position: relative;
+}
+
+.cpl-input-wrap .cpl-input {
+	padding-right: 48px;
+}
+
+.cpl-eye {
+	position: absolute;
+	right: 14px;
+	top: 50%;
+	transform: translateY(-50%);
+	background: none;
+	border: none;
+	cursor: pointer;
+	color: #9CA3AF;
+	padding: 4px;
+	display: flex;
+	align-items: center;
+	transition: color .15s;
+}
+.cpl-eye:hover { color: #6366F1; }
+
+/* ── Forgot / switch link ────────────────────────────────── */
+.cpl-switch-link {
+	display: block;
+	text-align: center;
+	margin-top: 18px;
+	font-family: 'DM Sans', sans-serif;
+	font-size: 13px;
+	color: #9CA3AF;
+	background: none;
+	border: none;
+	cursor: pointer;
+	text-decoration: underline;
+	padding: 0;
+}
+.cpl-switch-link:hover { color: #6366F1; }
+
 /* ── Mobile ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
 	.cpl-shell { flex-direction: column; }
@@ -342,6 +415,19 @@ injectStyles( 'cpl-s', `
 }
 ` );
 
+const EyeIcon = ( { open } ) => open ? (
+	<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+		<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+		<circle cx="12" cy="12" r="3"/>
+	</svg>
+) : (
+	<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+		<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/>
+		<path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/>
+		<line x1="1" y1="1" x2="23" y2="23"/>
+	</svg>
+);
+
 export default function PortalLogin() {
 	const { businessName, businessLogo } = window.cfPortalData || {};
 
@@ -352,118 +438,217 @@ export default function PortalLogin() {
 		.join( '' )
 		.toUpperCase();
 
-	const [ email,   setEmail   ] = useState( '' );
-	const [ phase,   setPhase   ] = useState( 'idle' ); // idle | loading | success | error
-	const [ errMsg,  setErrMsg  ] = useState( '' );
+	// Shared
+	const [ tab,    setTab    ] = useState( 'magic' ); // 'magic' | 'password'
 
-	async function handleSubmit( e ) {
+	// Magic link tab
+	const [ mlEmail,  setMlEmail  ] = useState( '' );
+	const [ mlPhase,  setMlPhase  ] = useState( 'idle' ); // idle | loading | success | error
+	const [ mlErr,    setMlErr    ] = useState( '' );
+
+	// Password tab
+	const [ pwEmail,   setPwEmail   ] = useState( '' );
+	const [ pwPass,    setPwPass    ] = useState( '' );
+	const [ showPass,  setShowPass  ] = useState( false );
+	const [ pwPhase,   setPwPhase   ] = useState( 'idle' ); // idle | loading | error
+	const [ pwErr,     setPwErr     ] = useState( '' );
+
+	function switchTab( t ) {
+		setTab( t );
+		setMlErr( '' ); setMlPhase( 'idle' );
+		setPwErr( '' ); setPwPhase( 'idle' );
+	}
+
+	async function handleMagicSubmit( e ) {
 		e.preventDefault();
-		if ( ! email ) return;
-
-		setPhase( 'loading' );
-		setErrMsg( '' );
-
+		if ( ! mlEmail ) return;
+		setMlPhase( 'loading' ); setMlErr( '' );
 		try {
 			const res = await apiFetch( '/portal/send-magic-link', {
 				method: 'POST',
-				body:   JSON.stringify( { email } ),
+				body:   JSON.stringify( { email: mlEmail } ),
 			} );
-
-			if ( res.success ) {
-				setPhase( 'success' );
-			} else {
-				setErrMsg( res.message || 'Something went wrong. Please try again.' );
-				setPhase( 'error' );
-			}
+			setMlPhase( res.success ? 'success' : 'error' );
+			if ( ! res.success ) setMlErr( res.message || 'Something went wrong.' );
 		} catch {
-			setErrMsg( 'Network error. Please check your connection and try again.' );
-			setPhase( 'error' );
+			setMlPhase( 'error' );
+			setMlErr( 'Network error. Please try again.' );
 		}
 	}
+
+	async function handlePasswordSubmit( e ) {
+		e.preventDefault();
+		if ( ! pwEmail || ! pwPass ) return;
+		setPwPhase( 'loading' ); setPwErr( '' );
+		try {
+			const res = await fetch( ( window.cfPortalData.apiUrl || '' ) + '/portal/login', {
+				method:  'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body:    JSON.stringify( { email: pwEmail, password: pwPass } ),
+			} ).then( r => r.json() );
+			if ( res.success ) {
+				window.location.href = res.redirect_url || '/clientflow/dashboard';
+			} else {
+				setPwPhase( 'error' );
+				setPwErr( res.message || 'Invalid email or password.' );
+			}
+		} catch {
+			setPwPhase( 'error' );
+			setPwErr( 'Network error. Please try again.' );
+		}
+	}
+
+	const BrandPanel = () => (
+		<div className="cpl-brand">
+			<div className="cpl-brand-deco cpl-brand-deco-1" />
+			<div className="cpl-brand-deco cpl-brand-deco-2" />
+			<div className="cpl-brand-inner">
+				<div className="cpl-logo-wrap">
+					{ businessLogo
+						? <img src={ businessLogo } alt={ businessName } />
+						: <span className="cpl-logo-initials">{ initials }</span>
+					}
+				</div>
+				{ businessName && <p className="cpl-brand-name">{ businessName }</p> }
+				<p className="cpl-brand-tagline">Your dedicated client space</p>
+			</div>
+		</div>
+	);
 
 	return (
 		<div className="cpl-shell">
 
-			{ /* ── Brand panel ── */ }
-			<div className="cpl-brand">
-				<div className="cpl-brand-deco cpl-brand-deco-1" />
-				<div className="cpl-brand-deco cpl-brand-deco-2" />
-				<div className="cpl-brand-inner">
-					<div className="cpl-logo-wrap">
-						{ businessLogo
-							? <img src={ businessLogo } alt={ businessName } />
-							: <span className="cpl-logo-initials">{ initials }</span>
-						}
-					</div>
-					{ businessName && <p className="cpl-brand-name">{ businessName }</p> }
-					<p className="cpl-brand-tagline">Your dedicated client space</p>
-				</div>
-			</div>
+			<BrandPanel />
 
-			{ /* ── Form panel ── */ }
 			<div className="cpl-form-panel">
 				<div className="cpl-card">
 
-					{ 'success' === phase ? (
-						<div className="cpl-success">
-							<div className="cpl-success-icon">
-								<svg width="28" height="28" viewBox="0 0 24 24" fill="none"
-									stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-									<polyline points="20 6 9 17 4 12"/>
-								</svg>
-							</div>
-							<h1 className="cpl-success-title">Check your email!</h1>
-							<p className="cpl-success-msg">
-								A login link is on its way to <strong>{ email }</strong>.
-								It&rsquo;ll arrive within a minute.
-							</p>
-							<button
-								className="cpl-retry-link"
-								onClick={ () => { setPhase( 'idle' ); setEmail( '' ); } }
-							>
-								Didn&rsquo;t receive it? Try again
-							</button>
-						</div>
-					) : (
-						<form onSubmit={ handleSubmit }>
-							<h1 className="cpl-heading">Welcome back</h1>
-							<p className="cpl-sub">
-								Enter your email address and we&rsquo;ll send you a secure login link.
-							</p>
+					<h1 className="cpl-heading">Welcome back</h1>
+					<p className="cpl-sub" style={{ marginBottom: 20 }}>
+						Sign in to your client portal.
+					</p>
 
-							<label className="cpl-label" htmlFor="cpl-email">Email address</label>
+					{ /* Tab switcher */ }
+					<div className="cpl-tabs" role="tablist">
+						<button
+							role="tab"
+							className={ `cpl-tab${ tab === 'magic' ? ' cpl-tab--active' : '' }` }
+							onClick={ () => switchTab( 'magic' ) }
+							aria-selected={ tab === 'magic' }
+						>
+							Magic link
+						</button>
+						<button
+							role="tab"
+							className={ `cpl-tab${ tab === 'password' ? ' cpl-tab--active' : '' }` }
+							onClick={ () => switchTab( 'password' ) }
+							aria-selected={ tab === 'password' }
+						>
+							Sign in
+						</button>
+					</div>
+
+					{ /* ── Magic link tab ── */ }
+					{ tab === 'magic' && (
+						mlPhase === 'success' ? (
+							<div className="cpl-success">
+								<div className="cpl-success-icon">
+									<svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+										stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+										<polyline points="20 6 9 17 4 12"/>
+									</svg>
+								</div>
+								<h2 className="cpl-success-title">Check your email!</h2>
+								<p className="cpl-success-msg">
+									A login link is on its way to <strong>{ mlEmail }</strong>.
+									It&rsquo;ll arrive within a minute.
+								</p>
+								<button
+									className="cpl-retry-link"
+									onClick={ () => { setMlPhase( 'idle' ); setMlEmail( '' ); } }
+								>
+									Didn&rsquo;t receive it? Try again
+								</button>
+							</div>
+						) : (
+							<form onSubmit={ handleMagicSubmit }>
+								<label className="cpl-label" htmlFor="cpl-ml-email">Email address</label>
+								<input
+									id="cpl-ml-email"
+									className="cpl-input"
+									type="email"
+									placeholder="you@example.com"
+									value={ mlEmail }
+									onChange={ e => setMlEmail( e.target.value ) }
+									required
+									autoFocus={ tab === 'magic' }
+								/>
+								{ mlPhase === 'error' && <div className="cpl-error">{ mlErr }</div> }
+								<button className="cpl-btn" type="submit" disabled={ mlPhase === 'loading' }>
+									{ mlPhase === 'loading'
+										? <><span className="cpl-spinner" />Sending your link&hellip;</>
+										: 'Send Login Link'
+									}
+								</button>
+								<p className="cpl-fine-print">Links expire in 24 hours and can only be used once.</p>
+							</form>
+						)
+					) }
+
+					{ /* ── Password tab ── */ }
+					{ tab === 'password' && (
+						<form onSubmit={ handlePasswordSubmit }>
+							<label className="cpl-label" htmlFor="cpl-pw-email">Email address</label>
 							<input
-								id="cpl-email"
+								id="cpl-pw-email"
 								className="cpl-input"
 								type="email"
 								placeholder="you@example.com"
-								value={ email }
-								onChange={ e => setEmail( e.target.value ) }
+								value={ pwEmail }
+								onChange={ e => setPwEmail( e.target.value ) }
 								required
-								autoFocus
+								autoFocus={ tab === 'password' }
+								style={{ marginBottom: 16 }}
 							/>
 
-							{ 'error' === phase && (
-								<div className="cpl-error">{ errMsg }</div>
-							) }
+							<label className="cpl-label" htmlFor="cpl-pw-pass">Password</label>
+							<div className="cpl-input-wrap">
+								<input
+									id="cpl-pw-pass"
+									className="cpl-input"
+									type={ showPass ? 'text' : 'password' }
+									placeholder="Your password"
+									value={ pwPass }
+									onChange={ e => setPwPass( e.target.value ) }
+									required
+									autoComplete="current-password"
+								/>
+								<button
+									type="button"
+									className="cpl-eye"
+									onClick={ () => setShowPass( v => ! v ) }
+									aria-label={ showPass ? 'Hide password' : 'Show password' }
+								>
+									<EyeIcon open={ showPass } />
+								</button>
+							</div>
 
-							<button
-								className="cpl-btn"
-								type="submit"
-								disabled={ 'loading' === phase }
-							>
-								{ 'loading' === phase
-									? <>
-										<span className="cpl-spinner" />
-										Sending your link&hellip;
-									</>
-									: 'Send Login Link'
+							{ pwPhase === 'error' && <div className="cpl-error">{ pwErr }</div> }
+
+							<button className="cpl-btn" type="submit" disabled={ pwPhase === 'loading' } style={{ marginTop: 20 }}>
+								{ pwPhase === 'loading'
+									? <><span className="cpl-spinner" />Signing in&hellip;</>
+									: 'Sign in →'
 								}
 							</button>
 
-							<p className="cpl-fine-print">
-								No password required. Links expire in 24 hours.
-							</p>
+							<button
+								type="button"
+								className="cpl-switch-link"
+								onClick={ () => switchTab( 'magic' ) }
+							>
+								No password yet? Send a magic link instead
+							</button>
 						</form>
 					) }
 

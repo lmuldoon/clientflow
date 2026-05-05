@@ -129,6 +129,25 @@ class ClientFlow_Milestone {
 			return new WP_Error( 'no_data', __( 'No valid fields to update.', 'clientflow' ), [ 'status' => 400 ] );
 		}
 
+		// Block status changes on completed milestones — they are permanently locked.
+		if ( isset( $update['status'] ) ) {
+			$current_status = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT status FROM " . self::table() . " WHERE id = %d AND owner_id = %d",
+					$id,
+					$owner_id
+				)
+			);
+
+			if ( 'completed' === $current_status ) {
+				return new WP_Error(
+					'milestone_locked',
+					__( 'Completed milestones cannot be changed.', 'clientflow' ),
+					[ 'status' => 422 ]
+				);
+			}
+		}
+
 		// Stamp completed_at when completing; clear it when un-completing.
 		if ( isset( $update['status'] ) ) {
 			if ( 'completed' === $update['status'] ) {

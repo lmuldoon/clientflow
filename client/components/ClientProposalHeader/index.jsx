@@ -23,6 +23,37 @@ const CSS = `
 	box-shadow: 0 2px 20px rgba(26,26,46,.05);
 }
 
+/* ── Portal back link ──────────────────────────────────────── */
+.cfh-portal-back {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 9px 48px;
+	font-family: 'DM Sans', sans-serif;
+	font-size: 12px;
+	font-weight: 500;
+	color: #9CA3AF;
+	text-decoration: none;
+	background: #FAFAF8;
+	border-bottom: 1px solid rgba(26,26,46,.06);
+	transition: color .12s, background .12s;
+}
+.cfh-portal-back:hover {
+	color: #6366F1;
+	background: #F5F6FF;
+}
+.cfh-portal-back svg {
+	flex-shrink: 0;
+	transition: transform .12s;
+}
+.cfh-portal-back:hover svg {
+	transform: translateX(-2px);
+}
+
+@media (max-width: 680px) {
+	.cfh-portal-back { padding: 9px 24px; }
+}
+
 /* ── State banners ─────────────────────────────────────────── */
 .cfh-banner {
 	padding: 13px 48px;
@@ -44,7 +75,7 @@ const CSS = `
 	margin: 0 auto;
 	padding: 44px 56px 36px;
 	display: grid;
-	grid-template-columns: 76px 1fr;
+	grid-template-columns: 1fr 5fr;
 	gap: 28px;
 	align-items: flex-start;
 }
@@ -220,8 +251,20 @@ export default function ClientProposalHeader( { proposal, businessName, business
 	const fmtDate = iso =>
 		iso ? new Date( iso ).toLocaleDateString( 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' } ) : '';
 
+	const isPortalClient = window.cfClientData?.isPortalClient;
+
 	return (
 		<header className="cfh-header">
+
+			{ isPortalClient && (
+				<a href="/clientflow/proposals" className="cfh-portal-back">
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+						stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+						<polyline points="15 18 9 12 15 6"/>
+					</svg>
+					Back to portal
+				</a>
+			) }
 
 			{ status === 'expired' && (
 				<div className="cfh-banner cfh-banner--expired">

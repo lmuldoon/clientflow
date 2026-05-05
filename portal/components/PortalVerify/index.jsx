@@ -176,7 +176,7 @@ export default function PortalVerify() {
 				if ( res.success ) {
 					setPhase( 'success' );
 					setTimeout( () => {
-						window.location.href = res.redirect_url || '/portal/dashboard';
+						window.location.href = res.redirect_url || '/clientflow/dashboard';
 					}, 1500 );
 				} else {
 					setPhase( 'error' );
@@ -240,7 +240,7 @@ export default function PortalVerify() {
 						</div>
 						<h1 className="cpv-title">Link Expired</h1>
 						<p className="cpv-msg">{ errMsg }</p>
-						<a className="cpv-btn" href="/portal/login">
+						<a className="cpv-btn" href="/clientflow/login">
 							Request a new login link
 						</a>
 					</>

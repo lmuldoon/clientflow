@@ -193,6 +193,14 @@ class ClientFlow_Payment {
 			);
 		}
 
+		// Fire hook so analytics cache is invalidated.
+		$payment = $wpdb->get_row(
+			$wpdb->prepare( "SELECT id, owner_id FROM " . self::table() . " WHERE stripe_session_id = %s", $session_id )
+		);
+		if ( $payment ) {
+			do_action( 'clientflow_payment_completed', (int) $payment->id, (int) $payment->owner_id );
+		}
+
 		return true;
 	}
 

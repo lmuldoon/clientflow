@@ -100,12 +100,14 @@ const CSS = `
 
 /* ─── Bubble ───────────────────────────────────────────────────────── */
 .cf-pm-bubble {
-  max-width: 72%;
+  max-width: 85%;
+  min-width: 60px;
   padding: 10px 14px;
   border-radius: 16px;
   font-size: 13.5px;
   line-height: 1.55;
   word-wrap: break-word;
+  overflow-wrap: break-word;
   position: relative;
 }
 
@@ -171,6 +173,7 @@ const CSS = `
   display: flex;
   align-items: flex-end;
   gap: 6px;
+  width: 100%;
 }
 .cf-pm-row.client .cf-pm-bubble-wrap { flex-direction: row; }
 .cf-pm-row.admin  .cf-pm-bubble-wrap { flex-direction: row-reverse; }
@@ -293,7 +296,7 @@ const CSS = `
 
 /* ─── Mobile ───────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
-  .cf-pm-bubble { max-width: 88%; }
+  .cf-pm-bubble { max-width: 92%; }
   .cf-pm-window { max-height: 360px; }
 }
 `;

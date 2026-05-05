@@ -156,6 +156,14 @@ class ClientFlow_Proposal_Client {
 			return $proposal;
 		}
 
+		if ( 'expired' === $proposal['status'] || ( ! empty( $proposal['expiry_date'] ) && strtotime( $proposal['expiry_date'] ) < time() ) ) {
+			return new WP_Error(
+				'proposal_expired',
+				__( 'This proposal has expired.', 'clientflow' ),
+				[ 'status' => 410 ]
+			);
+		}
+
 		if ( ! in_array( $proposal['status'], [ 'draft', 'sent', 'viewed' ], true ) ) {
 			return new WP_Error(
 				'invalid_status',
@@ -357,21 +365,21 @@ class ClientFlow_Proposal_Client {
 		$client = $row['client_name'] ?: __( 'A client', 'clientflow' );
 
 		if ( 'accepted' === $event ) {
-			$subject = sprintf( __( '🎉 Proposal Accepted: %s', 'clientflow' ), $row['title'] );
-			$body    = sprintf(
-				__( "%s has accepted your proposal \"%s\".\n\nLog in to view and follow up.", 'clientflow' ),
-				$client,
-				$row['title']
-			);
+			$subject   = sprintf( __( '🎉 Proposal Accepted: %s', 'clientflow' ), $row['title'] );
+			$body_html = cf_email_html( [
+				'body'      => '<p style="margin:0;font-size:16px;color:#6B7280;line-height:1.65;"><strong style="color:#1A1A2E;">' . esc_html( $client ) . '</strong> has accepted your proposal <em>' . esc_html( $row['title'] ) . '</em>.</p>',
+				'cta_label' => __( 'View Proposal', 'clientflow' ),
+				'cta_url'   => admin_url( 'admin.php?page=clientflow-proposals' ),
+			] );
 		} else {
-			$subject = sprintf( __( 'Proposal Declined: %s', 'clientflow' ), $row['title'] );
-			$body    = sprintf(
-				__( "%s has declined your proposal \"%s\".\n\nLog in to view details.", 'clientflow' ),
-				$client,
-				$row['title']
-			);
+			$subject   = sprintf( __( 'Proposal Declined: %s', 'clientflow' ), $row['title'] );
+			$body_html = cf_email_html( [
+				'body'      => '<p style="margin:0;font-size:16px;color:#6B7280;line-height:1.65;"><strong style="color:#1A1A2E;">' . esc_html( $client ) . '</strong> has declined your proposal <em>' . esc_html( $row['title'] ) . '</em>. Log in to view details.</p>',
+				'cta_label' => __( 'View Proposal', 'clientflow' ),
+				'cta_url'   => admin_url( 'admin.php?page=clientflow-proposals' ),
+			] );
 		}
 
-		wp_mail( $row['owner_email'], $subject, $body );
+		wp_mail( $row['owner_email'], $subject, $body_html, [ 'Content-Type: text/html; charset=UTF-8' ] );
 	}
 }

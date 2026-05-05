@@ -354,18 +354,20 @@ class ClientFlow_Approval {
 			return;
 		}
 
-		$client  = $row['client_name'] ?: __( 'Your client', 'clientflow' );
-		$label   = 'approved' === $status ? __( 'approved', 'clientflow' ) : __( 'requested changes on', 'clientflow' );
-		$subject = sprintf( __( 'Approval %s: %s — %s', 'clientflow' ), ucfirst( $status ), $row['type'], $row['project_name'] );
-		$body    = sprintf(
-			__( "%s has %s the approval request for \"%s\" on project \"%s\".\n\nLog in to view details.", 'clientflow' ),
-			$client,
-			$label,
-			$row['description'] ?: $row['type'],
-			$row['project_name']
-		);
+		$client_name  = esc_html( $row['client_name'] ?: __( 'Your client', 'clientflow' ) );
+		$label_html   = 'approved' === $status
+			? '<span style="color:#059669;font-weight:600;">approved</span>'
+			: '<span style="color:#B91C1C;font-weight:600;">requested changes on</span>';
+		$desc         = esc_html( $row['description'] ?: $row['type'] );
+		$project_name = esc_html( $row['project_name'] );
+		$subject      = sprintf( __( 'Approval %s: %s — %s', 'clientflow' ), ucfirst( $status ), $row['type'], $row['project_name'] );
+		$body_html    = cf_email_html( [
+			'body'      => "<p style=\"margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;\"><strong style=\"color:#1A1A2E;\">{$client_name}</strong> has {$label_html} the approval request for <em>{$desc}</em> on project <strong style=\"color:#1A1A2E;\">{$project_name}</strong>.</p>",
+			'cta_label' => __( 'View Approval', 'clientflow' ),
+			'cta_url'   => admin_url( 'admin.php?page=clientflow-projects' ),
+		] );
 
-		wp_mail( $row['owner_email'], $subject, $body );
+		wp_mail( $row['owner_email'], $subject, $body_html, [ 'Content-Type: text/html; charset=UTF-8' ] );
 	}
 
 	/**
@@ -412,7 +414,7 @@ class ClientFlow_Approval {
 			'name'      => $row['client_name'] ?: '',
 			'body'      => $body_html,
 			'cta_label' => __( 'Review & Respond', 'clientflow' ),
-			'cta_url'   => home_url( '/portal/' ),
+			'cta_url'   => home_url( '/clientflow/' ),
 		] );
 
 		wp_mail( $row['client_email'], $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );

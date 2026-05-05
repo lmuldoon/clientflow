@@ -108,6 +108,15 @@ function cf_rest_create_approval( WP_REST_Request $request ): WP_REST_Response|W
 	$owner_id   = get_current_user_id();
 	$project_id = (int) $request->get_param( 'id' );
 
+	$lock_error = cf_project_lock_check( $project_id, $owner_id );
+	if ( $lock_error ) {
+		return new WP_Error(
+			'project_locked',
+			__( 'This project is complete — approval requests can no longer be added.', 'clientflow' ),
+			[ 'status' => 422 ]
+		);
+	}
+
 	$result = ClientFlow_Approval::create( $project_id, $owner_id, [
 		'type'        => $request->get_param( 'type' ),
 		'description' => $request->get_param( 'description' ),
@@ -149,10 +158,30 @@ function cf_portal_rest_list_approvals( WP_REST_Request $request ): WP_REST_Resp
 }
 
 function cf_portal_rest_respond_approval( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	global $wpdb;
+
 	$client_id   = get_current_user_id();
 	$approval_id = (int) $request->get_param( 'aid' );
 	$status      = (string) $request->get_param( 'status' );
 	$comment     = (string) $request->get_param( 'comment' );
+
+	// Block responds on completed projects.
+	$proj_status = $wpdb->get_var(
+		$wpdb->prepare(
+			"SELECT p.status
+			 FROM {$wpdb->prefix}clientflow_approvals a
+			 JOIN {$wpdb->prefix}clientflow_projects p ON p.id = a.project_id
+			 WHERE a.id = %d",
+			$approval_id
+		)
+	);
+	if ( 'completed' === $proj_status ) {
+		return new WP_Error(
+			'project_locked',
+			__( 'This project is complete — approvals can no longer be responded to.', 'clientflow' ),
+			[ 'status' => 422 ]
+		);
+	}
 
 	$result = ClientFlow_Approval::respond( $approval_id, $client_id, $status, $comment );
 

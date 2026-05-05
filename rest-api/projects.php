@@ -100,6 +100,14 @@ add_action( 'rest_api_init', static function (): void {
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 
+	// ── GET /projects/{id}/payments ───────────────────────────────────────────
+	register_rest_route( $ns, '/projects/(?P<id>\d+)/payments', [
+		'methods'             => WP_REST_Server::READABLE,
+		'callback'            => 'cf_rest_get_project_payments',
+		'permission_callback' => 'cf_rest_require_auth',
+		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
+	] );
+
 	// ── POST /projects/{id}/milestones ────────────────────────────────────────
 	register_rest_route( $ns, '/projects/(?P<id>\d+)/milestones', [
 		'methods'             => WP_REST_Server::CREATABLE,
@@ -206,11 +214,63 @@ function cf_rest_list_projects( WP_REST_Request $request ): WP_REST_Response {
 }
 
 function cf_rest_get_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	global $wpdb;
+
 	$user_id = get_current_user_id();
 	$id      = (int) $request->get_param( 'id' );
 	$result  = ClientFlow_Project::get( $id, $user_id );
 	if ( is_wp_error( $result ) ) return $result;
+
+	// Keep proposal status in sync whenever this project is viewed.
+	if ( 'completed' === ( $result['status'] ?? '' ) && ! empty( $result['proposal_id'] ) ) {
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$wpdb->prefix}clientflow_proposals
+				 SET status = 'completed'
+				 WHERE id = %d AND owner_id = %d AND status NOT IN ('completed', 'expired')",
+				(int) $result['proposal_id'],
+				$user_id
+			)
+		);
+	}
+
 	return new WP_REST_Response( [ 'project' => $result ], 200 );
+}
+
+/**
+ * Returns a WP_Error if the given project is locked (completed + fully paid), null otherwise.
+ */
+function cf_project_lock_check( int $project_id, int $owner_id ): ?WP_Error {
+	global $wpdb;
+
+	$row = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT pr.status,
+			        COALESCE(prop.total_amount, 0) AS total_amount,
+			        COALESCE(
+			            ( SELECT SUM(pm.amount)
+			              FROM {$wpdb->prefix}clientflow_payments pm
+			              WHERE pm.proposal_id = pr.proposal_id AND pm.status = 'completed' ),
+			            0
+			        ) AS total_paid
+			 FROM {$wpdb->prefix}clientflow_projects pr
+			 LEFT JOIN {$wpdb->prefix}clientflow_proposals prop ON prop.id = pr.proposal_id
+			 WHERE pr.id = %d AND pr.owner_id = %d",
+			$project_id,
+			$owner_id
+		),
+		ARRAY_A
+	);
+
+	if ( ! $row || 'completed' !== $row['status'] ) {
+		return null;
+	}
+
+	$fully_paid = (float) $row['total_amount'] <= 0 || (float) $row['total_paid'] >= (float) $row['total_amount'];
+
+	return $fully_paid
+		? new WP_Error( 'project_locked', __( 'This project is complete and fully paid — it can no longer be edited.', 'clientflow' ), [ 'status' => 422 ] )
+		: null;
 }
 
 function cf_rest_update_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
@@ -223,6 +283,10 @@ function cf_rest_update_project( WP_REST_Request $request ): WP_REST_Response|WP
 		static fn( $k ) => in_array( $k, [ 'name', 'description', 'status' ], true ),
 		ARRAY_FILTER_USE_KEY
 	);
+
+	// Gate: completed + fully-paid projects are locked — no further edits allowed.
+	$lock_error = cf_project_lock_check( $id, $user_id );
+	if ( $lock_error ) return $lock_error;
 
 	// Gate: cannot mark completed until all milestones are done.
 	if ( isset( $data['status'] ) && 'completed' === $data['status'] ) {
@@ -252,6 +316,17 @@ function cf_rest_update_project( WP_REST_Request $request ): WP_REST_Response|WP
 			);
 		}
 		cf_send_project_completion_email( $project );
+	} elseif ( ! is_wp_error( $project ) && 'completed' === ( $project['status'] ?? '' ) && ! empty( $project['proposal_id'] ) ) {
+		// Project is already complete — sync the proposal status in case it was missed.
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$wpdb->prefix}clientflow_proposals
+				 SET status = 'completed'
+				 WHERE id = %d AND owner_id = %d AND status NOT IN ('completed', 'expired')",
+				(int) $project['proposal_id'],
+				$user_id
+			)
+		);
 	}
 
 	return new WP_REST_Response( [ 'project' => $project ], 200 );
@@ -265,9 +340,64 @@ function cf_rest_delete_project( WP_REST_Request $request ): WP_REST_Response|WP
 	return new WP_REST_Response( [ 'deleted' => true, 'id' => $id ], 200 );
 }
 
+function cf_rest_get_project_payments( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	global $wpdb;
+
+	$user_id = get_current_user_id();
+	$id      = (int) $request->get_param( 'id' );
+
+	$project = ClientFlow_Project::get( $id, $user_id );
+	if ( is_wp_error( $project ) ) return $project;
+
+	$proposal_id    = (int) ( $project['proposal_id'] ?? 0 );
+	$proposal_total = null;
+
+	if ( $proposal_id ) {
+		$proposal_total = (float) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT total_amount FROM {$wpdb->prefix}clientflow_proposals WHERE id = %d",
+				$proposal_id
+			)
+		);
+	}
+
+	$rows = $proposal_id ? $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT id, amount, currency, deposit_pct, status, completed_at, created_at
+			 FROM {$wpdb->prefix}clientflow_payments
+			 WHERE proposal_id = %d
+			 ORDER BY created_at ASC",
+			$proposal_id
+		),
+		ARRAY_A
+	) : [];
+
+	$payments   = array_map( static function ( array $r ): array {
+		$r['id']          = (int) $r['id'];
+		$r['amount']      = (float) $r['amount'];
+		$r['deposit_pct'] = (int) $r['deposit_pct'];
+		return $r;
+	}, $rows ?: [] );
+
+	$total_paid = array_sum( array_column(
+		array_filter( $payments, static fn( $p ) => 'completed' === $p['status'] ),
+		'amount'
+	) );
+
+	return new WP_REST_Response( [
+		'payments'       => $payments,
+		'total_paid'     => $total_paid,
+		'proposal_total' => $proposal_total,
+		'remaining'      => $proposal_total !== null ? max( 0.0, $proposal_total - $total_paid ) : null,
+	], 200 );
+}
+
 function cf_rest_create_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$user_id    = get_current_user_id();
 	$project_id = (int) $request->get_param( 'id' );
+
+	$lock_error = cf_project_lock_check( $project_id, $user_id );
+	if ( $lock_error ) return $lock_error;
 
 	// Ownership check.
 	$project = ClientFlow_Project::get( $project_id, $user_id );
@@ -366,6 +496,17 @@ function cf_rest_submit_milestone( WP_REST_Request $request ): WP_REST_Response|
 	if ( is_wp_error( $result ) ) return $result;
 
 	$project = ClientFlow_Project::get( $project_id, $user_id );
+
+	// Find the submitted milestone title for the email.
+	$milestone_title = '';
+	foreach ( $project['milestones'] ?? [] as $m ) {
+		if ( (int) $m['id'] === $mid ) {
+			$milestone_title = $m['title'];
+			break;
+		}
+	}
+	cf_send_milestone_submitted_email( $project, $milestone_title );
+
 	return new WP_REST_Response( [ 'project' => $project ], 200 );
 }
 
@@ -401,6 +542,19 @@ function cf_portal_rest_approve_milestone( WP_REST_Request $request ): WP_REST_R
 
 	// Reload so the response has the updated milestone status.
 	$project = ClientFlow_Portal_Data::get_project( $user_id, $project_id );
+
+	// Notify the project owner.
+	$milestone_title = '';
+	foreach ( ( ! is_wp_error( $project ) ? $project['milestones'] ?? [] : [] ) as $m ) {
+		if ( (int) $m['id'] === $mid ) {
+			$milestone_title = $m['title'];
+			break;
+		}
+	}
+	if ( ! is_wp_error( $project ) ) {
+		cf_send_milestone_approved_email( $project, $milestone_title );
+	}
+
 	return new WP_REST_Response( [ 'project' => $project ], 200 );
 }
 
@@ -439,6 +593,81 @@ function cf_project_client_data( array $project ): array {
 }
 
 /**
+ * Email the client that a milestone has been submitted for their approval.
+ *
+ * @param array  $project        Full project row (from ClientFlow_Project::get).
+ * @param string $milestone_title
+ */
+function cf_send_milestone_submitted_email( array $project, string $milestone_title ): void {
+	$client = cf_project_client_data( $project );
+	if ( ! $client['email'] ) return;
+
+	$project_name  = esc_html( $project['name'] ?? '' );
+	$milestone_esc = esc_html( $milestone_title );
+	$subject = 'Milestone Ready for Approval' . ( $milestone_title ? ': ' . $milestone_title : '' );
+
+	$body_html = "
+		<p style=\"margin:0;font-size:16px;color:#6B7280;line-height:1.65;\">
+			A milestone on your project <strong style=\"color:#1A1A2E;\">{$project_name}</strong>
+			has been submitted and is ready for your review and approval.
+		</p>
+		<div style=\"margin:20px 0;padding:16px 20px;background:#EEF2FF;border-radius:10px;border-left:3px solid #6366F1;\">
+			<p style=\"margin:0;font-size:13px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#6366F1;\">Awaiting Approval</p>
+			<p style=\"margin:6px 0 0;font-size:16px;font-weight:600;color:#1A1A2E;\">{$milestone_esc}</p>
+		</div>
+		<p style=\"margin:0;font-size:16px;color:#6B7280;line-height:1.65;\">
+			Log in to your portal to review and approve this milestone.
+		</p>";
+
+	$message = cf_email_html( [
+		'name'      => $client['name'],
+		'body'      => $body_html,
+		'cta_label' => 'Review Milestone',
+		'cta_url'   => home_url( '/clientflow/' ),
+	] );
+
+	wp_mail( $client['email'], $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
+}
+
+/**
+ * Email the project owner (admin) that a client approved a milestone.
+ *
+ * @param array  $project        Portal project row (includes owner_id, name).
+ * @param string $milestone_title
+ */
+function cf_send_milestone_approved_email( array $project, string $milestone_title ): void {
+	$owner = get_userdata( (int) ( $project['owner_id'] ?? 0 ) );
+	if ( ! $owner || ! $owner->user_email ) return;
+
+	$project_name  = esc_html( $project['name'] ?? '' );
+	$milestone_esc = esc_html( $milestone_title );
+	$client_name   = esc_html( $project['client_name'] ?? 'Your client' );
+	$subject       = 'Milestone Approved' . ( $milestone_title ? ': ' . $milestone_title : '' );
+
+	$body_html = "
+		<p style=\"margin:0;font-size:16px;color:#6B7280;line-height:1.65;\">
+			<strong style=\"color:#1A1A2E;\">{$client_name}</strong> has approved a milestone
+			on project <strong style=\"color:#1A1A2E;\">{$project_name}</strong>.
+		</p>
+		<div style=\"margin:20px 0;padding:16px 20px;background:#F0FDF4;border-radius:10px;border-left:3px solid #10B981;\">
+			<p style=\"margin:0;font-size:13px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#10B981;\">Approved</p>
+			<p style=\"margin:6px 0 0;font-size:16px;font-weight:600;color:#1A1A2E;\">{$milestone_esc}</p>
+		</div>
+		<p style=\"margin:0;font-size:16px;color:#6B7280;line-height:1.65;\">
+			You can now mark this milestone as complete in your projects dashboard.
+		</p>";
+
+	$message = cf_email_html( [
+		'name'      => $owner->display_name,
+		'body'      => $body_html,
+		'cta_label' => 'View Project',
+		'cta_url'   => admin_url( 'admin.php?page=clientflow-projects' ),
+	] );
+
+	wp_mail( $owner->user_email, $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
+}
+
+/**
  * Email the client that a milestone has been marked complete.
  *
  * @param array  $project        Full project row (from ClientFlow_Project::get).
@@ -469,7 +698,7 @@ function cf_send_milestone_complete_email( array $project, string $milestone_tit
 		'name'      => $client['name'],
 		'body'      => $body_html,
 		'cta_label' => 'View Project',
-		'cta_url'   => home_url( '/portal/' ),
+		'cta_url'   => home_url( '/clientflow/' ),
 	] );
 
 	wp_mail( $client['email'], $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
@@ -534,7 +763,7 @@ function cf_send_project_completion_email( array $project ): void {
 		'name'      => $client['name'],
 		'body'      => $body_html,
 		'cta_label' => 'View Project',
-		'cta_url'   => home_url( '/portal/' ),
+		'cta_url'   => home_url( '/clientflow/' ),
 	] );
 
 	wp_mail( $client['email'], $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );

@@ -153,14 +153,15 @@ $favicon_url = get_site_icon_url( 32 );
 
 	<script>
 		window.cfClientData = {
-			apiUrl:        <?php echo wp_json_encode( rest_url( 'clientflow/v1/' ) ); ?>,
-			token:         <?php echo wp_json_encode( $cf_proposal_token ); ?>,
-			businessName:  <?php echo wp_json_encode( $business_name ); ?>,
-			businessLogo:  <?php echo wp_json_encode( $business_logo ); ?>,
-			nonce:         <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?>,
-			pageType:      <?php echo wp_json_encode( $cf_payment_result ?: 'proposal' ); ?>,
-			sessionId:     <?php echo wp_json_encode( $cf_session_id ); ?>,
-			clientEmail:   <?php echo wp_json_encode( $client_email ); ?>
+			apiUrl:          <?php echo wp_json_encode( rest_url( 'clientflow/v1/' ) ); ?>,
+			token:           <?php echo wp_json_encode( $cf_proposal_token ); ?>,
+			businessName:    <?php echo wp_json_encode( $business_name ); ?>,
+			businessLogo:    <?php echo wp_json_encode( $business_logo ); ?>,
+			nonce:           <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?>,
+			pageType:        <?php echo wp_json_encode( $cf_payment_result ?: 'proposal' ); ?>,
+			sessionId:       <?php echo wp_json_encode( $cf_session_id ); ?>,
+			clientEmail:     <?php echo wp_json_encode( $client_email ); ?>,
+			isPortalClient:  <?php echo wp_json_encode( class_exists( 'ClientFlow_Portal_Auth' ) && ClientFlow_Portal_Auth::is_authenticated() ); ?>
 		};
 	</script>
 

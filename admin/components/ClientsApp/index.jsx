@@ -544,7 +544,7 @@ export default function ClientsApp() {
 								return (
 									<tr
 										key={ client.id }
-										className={ `cf-cl-tr${ isPending && client.latest_proposal_accepted_at ? ' has-pending' : '' }` }
+										className={ `cf-cl-tr${ isPending && client.latest_proposal_date ? ' has-pending' : '' }` }
 									>
 										{ /* Client name + email */ }
 										<td className="cf-cl-td">
@@ -569,7 +569,7 @@ export default function ClientsApp() {
 											{ client.latest_proposal_title ? (
 												<>
 													<div className="cf-cl-meta">{ client.latest_proposal_title }</div>
-													<div className="cf-cl-meta-dim">Accepted { formatDate( client.latest_proposal_accepted_at ) }</div>
+													<div className="cf-cl-meta-dim">{ client.latest_proposal_status === 'completed' ? 'Completed' : 'Accepted' } { formatDate( client.latest_proposal_date ) }</div>
 												</>
 											) : (
 												<span style={ { color:'#CBD5E1', fontSize:13 } }>No accepted proposals</span>

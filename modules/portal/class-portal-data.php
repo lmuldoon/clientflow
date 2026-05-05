@@ -98,7 +98,7 @@ class ClientFlow_Portal_Data {
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT pm.id, pm.proposal_id, pm.amount, pm.currency, pm.status,
-				        pm.stripe_payment_intent_id, pm.created_at, pm.updated_at,
+				        pm.stripe_session_id, pm.stripe_payment_intent_id, pm.created_at, pm.updated_at,
 				        pr.title AS proposal_title, pr.token AS proposal_token
 				 FROM   {$pm}  AS pm
 				 JOIN   {$pt}  AS pr ON pr.id = pm.proposal_id
@@ -158,7 +158,7 @@ class ClientFlow_Portal_Data {
 				 LEFT JOIN {$mt} m ON m.project_id = pr.id
 				 WHERE  c.email = %s
 				 GROUP  BY pr.id
-				 ORDER  BY pr.created_at DESC",
+				 ORDER  BY pr.deleted_at IS NOT NULL ASC, pr.created_at DESC",
 				$user->user_email
 			),
 			ARRAY_A

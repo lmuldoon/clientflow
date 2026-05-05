@@ -16,21 +16,23 @@ import { useState, useMemo } from '@wordpress/element';
 import { cfFetch } from '../../App';
 
 const TABS = [
-	{ id: 'all',      label: 'All'      },
-	{ id: 'draft',    label: 'Draft'    },
-	{ id: 'sent',     label: 'Sent'     },
-	{ id: 'viewed',   label: 'Viewed'   },
-	{ id: 'accepted', label: 'Accepted' },
-	{ id: 'declined', label: 'Declined' },
+	{ id: 'all',       label: 'All'       },
+	{ id: 'draft',     label: 'Draft'     },
+	{ id: 'sent',      label: 'Sent'      },
+	{ id: 'viewed',    label: 'Viewed'    },
+	{ id: 'accepted',  label: 'Accepted'  },
+	{ id: 'completed', label: 'Completed' },
+	{ id: 'declined',  label: 'Declined'  },
 ];
 
 const STATUS_CONFIG = {
-	draft:    { bg: 'var(--cf-slate-100)',   color: 'var(--cf-slate-600)',   label: 'Draft'    },
-	sent:     { bg: 'var(--cf-indigo-bg)',   color: 'var(--cf-indigo)',      label: 'Sent'     },
-	viewed:   { bg: 'var(--cf-amber-bg)',    color: 'var(--cf-amber)',       label: 'Viewed'   },
-	accepted: { bg: 'var(--cf-emerald-bg)',  color: 'var(--cf-emerald)',     label: 'Accepted' },
-	declined: { bg: 'var(--cf-red-bg)',      color: 'var(--cf-red)',         label: 'Declined' },
-	expired:  { bg: 'var(--cf-slate-100)',   color: 'var(--cf-slate-400)',   label: 'Expired'  },
+	draft:     { bg: 'var(--cf-slate-100)',   color: 'var(--cf-slate-600)',   label: 'Draft'     },
+	sent:      { bg: 'var(--cf-indigo-bg)',   color: 'var(--cf-indigo)',      label: 'Sent'      },
+	viewed:    { bg: 'var(--cf-amber-bg)',    color: 'var(--cf-amber)',       label: 'Viewed'    },
+	accepted:  { bg: 'var(--cf-emerald-bg)',  color: 'var(--cf-emerald)',     label: 'Accepted'  },
+	completed: { bg: 'var(--cf-emerald-bg)',  color: 'var(--cf-emerald)',     label: 'Completed' },
+	declined:  { bg: 'var(--cf-red-bg)',      color: 'var(--cf-red)',         label: 'Declined'  },
+	expired:   { bg: 'var(--cf-slate-100)',   color: 'var(--cf-slate-400)',   label: 'Expired'   },
 };
 
 const CURRENCY_SYMBOLS = { GBP: '£', USD: '$', EUR: '€', CAD: '$', AUD: '$' };
@@ -598,6 +600,19 @@ export default function ProposalList( {
 		}
 	}
 
+	async function handleMarkCompleted( id ) {
+		if ( ! window.confirm( 'Mark this proposal as completed? This cannot be undone.' ) ) return;
+		try {
+			await cfFetch( `proposals/${ id }/update`, {
+				method: 'POST',
+				body:   JSON.stringify( { status: 'completed' } ),
+			} );
+			onRefresh();
+		} catch ( e ) {
+			alert( e.message || 'Update failed.' );
+		}
+	}
+
 	return (
 		<div className="cf-list-wrap">
 			{/* Header */ }
@@ -781,6 +796,18 @@ export default function ProposalList( {
 									</svg>
 								</button>
 							</>
+						) }
+						{ [ 'draft', 'sent', 'viewed', 'accepted' ].includes( proposal.status ) && (
+							<button
+								type="button"
+								className="cf-list-action-btn"
+								title="Mark as completed"
+								onClick={ () => handleMarkCompleted( proposal.id ) }
+							>
+								<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+									<polyline points="20 6 9 17 4 12"/>
+								</svg>
+							</button>
 						) }
 						<button
 							type="button"

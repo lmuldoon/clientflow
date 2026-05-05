@@ -141,6 +141,28 @@ injectStyles( 'cppm-s', `
 }
 .cppm-prop-link:hover { color: #6366F1; text-decoration: underline; }
 
+.cppm-receipt-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-family: 'DM Sans', sans-serif;
+	font-size: 12px;
+	font-weight: 600;
+	color: #6366F1;
+	text-decoration: none;
+	padding: 4px 10px;
+	border: 1px solid #E0E0F8;
+	border-radius: 6px;
+	background: #F5F4FF;
+	white-space: nowrap;
+	transition: background .15s, border-color .15s;
+}
+.cppm-receipt-link:hover {
+	background: #EEEDFF;
+	border-color: #C7C5F5;
+	text-decoration: none;
+}
+
 /* ── Running total row ────────────────────────────────── */
 .cppm-total-row td {
 	background: #F8F7F5 !important;
@@ -262,12 +284,13 @@ export default function PortalPayments() {
 							<th className="right">Amount</th>
 							<th className="col-date">Date</th>
 							<th>Status</th>
+							<th />
 						</tr>
 					</thead>
 					<tbody>
 						{ payments.length === 0 ? (
 							<tr>
-								<td colSpan="4">
+								<td colSpan="5">
 									<div className="cppm-empty">
 										<p className="cppm-empty-msg">No payments yet.</p>
 										<p className="cppm-empty-sub">
@@ -297,6 +320,21 @@ export default function PortalPayments() {
 									{ formatDate( pm.created_at ) }
 								</td>
 								<td><StatusBadge status={ pm.status } /></td>
+								<td onClick={ e => e.stopPropagation() } style={{ width: 1, whiteSpace: 'nowrap' }}>
+									{ pm.status === 'completed' && (
+										<a
+											className="cppm-receipt-link"
+											href={ `/clientflow/receipt?payment=${ pm.id }` }
+											target="_blank"
+											rel="noreferrer"
+										>
+											<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+												<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+											</svg>
+											Receipt
+										</a>
+									) }
+								</td>
 							</tr>
 						) ) }
 					</tbody>
@@ -309,6 +347,7 @@ export default function PortalPayments() {
 									{ fmt( runningTotal, currency ) }
 								</td>
 								<td className="col-date" />
+								<td />
 								<td />
 							</tr>
 						</tfoot>

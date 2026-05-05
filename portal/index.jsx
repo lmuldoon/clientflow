@@ -12,9 +12,11 @@
 // component module evaluates its top-level injectStyles() calls.
 import './portal-globals';
 
-import PortalLogin   from './components/PortalLogin';
-import PortalVerify  from './components/PortalVerify';
-import PortalApp     from './components/PortalApp';
+import PortalLogin       from './components/PortalLogin';
+import PortalVerify      from './components/PortalVerify';
+import PortalSetPassword from './components/PortalSetPassword';
+import PortalReceipt     from './components/PortalReceipt';
+import PortalApp         from './components/PortalApp';
 
 const { render } = wp.element;
 
@@ -25,7 +27,11 @@ if ( 'login' === page ) {
 	render( <PortalLogin />, root );
 } else if ( 'verify' === page ) {
 	render( <PortalVerify />, root );
+} else if ( 'set-password' === page ) {
+	render( <PortalSetPassword />, root );
+} else if ( 'receipt' === page ) {
+	render( <PortalReceipt />, root );
 } else {
-	// dashboard | proposals | payments
+	// dashboard | proposals | payments | projects
 	render( <PortalApp page={ page } />, root );
 }

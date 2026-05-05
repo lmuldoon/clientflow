@@ -421,7 +421,7 @@ class ClientFlow_Message {
 			$owner_name   = esc_html( $msg['owner_name'] );
 			$msg_text     = esc_html( $msg['message'] );
 
-			$subject   = sprintf( __( 'New message on project: %s', 'clientflow' ), $msg['project_name'] );
+			$subject   = sprintf( 'New message on project: %s', $msg['project_name'] ?: 'your project' );
 			$body_html = "
 				<p style=\"margin:0;font-size:16px;color:#6B7280;line-height:1.65;\">
 					You have a new message from <strong style=\"color:#1A1A2E;\">{$owner_name}</strong> on
@@ -438,7 +438,7 @@ class ClientFlow_Message {
 				'name'      => $msg['client_name'] ?: '',
 				'body'      => $body_html,
 				'cta_label' => __( 'Reply in Portal', 'clientflow' ),
-				'cta_url'   => home_url( '/portal/' ),
+				'cta_url'   => home_url( '/clientflow/' ),
 			] );
 			wp_mail( $msg['client_email'], $subject, $html_message, [ 'Content-Type: text/html; charset=UTF-8' ] );
 		} else {
@@ -446,14 +446,25 @@ class ClientFlow_Message {
 			if ( ! $msg['owner_email'] ) {
 				return;
 			}
-			$subject = sprintf( __( 'New client message on project: %s', 'clientflow' ), $msg['project_name'] );
-			$body    = sprintf(
-				__( "%s has sent a message on project \"%s\":\n\n\"%s\"\n\nLog in to view and reply.", 'clientflow' ),
-				$msg['client_name'] ?: __( 'Your client', 'clientflow' ),
-				$msg['project_name'],
-				$msg['message']
-			);
-			wp_mail( $msg['owner_email'], $subject, $body );
+			// sanitize_text_field strips newlines and control characters — safe for email subject headers.
+			// esc_html is only used for the HTML body below.
+			$client_display_name = sanitize_text_field( $msg['client_name'] ?: __( 'Your client', 'clientflow' ) );
+			$project_display_name = sanitize_text_field( $msg['project_name'] ?: __( 'your project', 'clientflow' ) );
+
+			$client_name  = esc_html( $client_display_name );
+			$project_name = esc_html( $msg['project_name'] );
+			$msg_text     = esc_html( $msg['message'] );
+			$subject      = sprintf( 'New message from %s on project: %s', $client_display_name, $project_display_name );
+			$body_html    = cf_email_html( [
+				'body'      => "
+					<p style=\"margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;\"><strong style=\"color:#1A1A2E;\">{$client_name}</strong> sent a message on project <strong style=\"color:#1A1A2E;\">{$project_name}</strong>.</p>
+					<div style=\"margin:0;padding:16px 20px;background:#F9FAFB;border-radius:10px;border-left:3px solid #D1D5DB;\">
+						<p style=\"margin:0;font-size:15px;color:#374151;line-height:1.7;font-style:italic;\">&ldquo;{$msg_text}&rdquo;</p>
+					</div>",
+				'cta_label' => __( 'View Message', 'clientflow' ),
+				'cta_url'   => admin_url( 'admin.php?page=clientflow-projects' ),
+			] );
+			wp_mail( $msg['owner_email'], $subject, $body_html, [ 'Content-Type: text/html; charset=UTF-8' ] );
 		}
 	}
 }

@@ -25,6 +25,9 @@ class ClientFlow_Portal_Auth {
 	/** User meta key linking WP user → client row. */
 	const META_CLIENT = '_cf_client_id';
 
+	/** User meta key flagging that the client has set their own password. */
+	const META_PASSWORD_SET = '_cf_portal_password_set';
+
 	/** Token lifetime in seconds (24 hours). */
 	const TOKEN_TTL = 86400;
 
@@ -92,6 +95,12 @@ class ClientFlow_Portal_Auth {
 		}
 
 		// Create a new minimal WP user.
+		// Suppress WordPress's default new-user notification emails — the portal
+		// sends its own magic-link email instead.
+		$suppress = static fn() => false;
+		add_filter( 'wp_send_new_user_notification_to_admin', $suppress );
+		add_filter( 'wp_send_new_user_notification_to_user',  $suppress );
+
 		$username = self::unique_username_from_email( $email );
 
 		$user_id = wp_insert_user( [
@@ -102,6 +111,9 @@ class ClientFlow_Portal_Auth {
 			// Random password — client never uses a password, only magic links.
 			'user_pass'    => wp_generate_password( 48, true, true ),
 		] );
+
+		remove_filter( 'wp_send_new_user_notification_to_admin', $suppress );
+		remove_filter( 'wp_send_new_user_notification_to_user',  $suppress );
 
 		if ( is_wp_error( $user_id ) ) {
 			return $user_id;
@@ -213,6 +225,24 @@ class ClientFlow_Portal_Auth {
 	}
 
 	// -------------------------------------------------------------------------
+	// Password helpers
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Whether the given user has explicitly set their own portal password.
+	 */
+	public static function has_set_password( int $user_id ): bool {
+		return (bool) get_user_meta( $user_id, self::META_PASSWORD_SET, true );
+	}
+
+	/**
+	 * Mark that the given user has set their own portal password.
+	 */
+	public static function mark_password_set( int $user_id ): void {
+		update_user_meta( $user_id, self::META_PASSWORD_SET, '1' );
+	}
+
+	// -------------------------------------------------------------------------
 	// Auth checks
 	// -------------------------------------------------------------------------
 
@@ -289,16 +319,21 @@ class ClientFlow_Portal_Auth {
 	 */
 	public static function send_magic_link_email( WP_User $user, string $raw_token ): bool {
 		$business_name = get_option( 'blogname', 'ClientFlow' );
-		$portal_url    = home_url( '/portal/verify?token=' . rawurlencode( $raw_token ) );
+		$portal_url    = home_url( '/clientflow/verify?token=' . rawurlencode( $raw_token ) );
+		$login_url     = home_url( '/clientflow/login' );
 		$subject       = sprintf( 'Your login link for %s', $business_name );
+		$expiry_hours  = (int) ( self::TOKEN_TTL / 3600 );
 
-		$message = self::build_email_html( $user, $portal_url, $business_name );
+		$message = cf_email_html( [
+			'name'          => $user->display_name,
+			'business_name' => $business_name,
+			'body'          => '<p style="margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;">Click the button below to securely log in to your client portal. This link expires in <strong style="color:#1A1A2E;">' . $expiry_hours . ' hours</strong> and can only be used once.</p>',
+			'cta_label'     => 'Access Your Portal',
+			'cta_url'       => $portal_url,
+			'footer'        => 'Bookmark your portal for easy access: <a href="' . esc_url( $login_url ) . '" style="color:#6366F1;">' . esc_html( $login_url ) . '</a>',
+		] );
 
-		$headers = [
-			'Content-Type: text/html; charset=UTF-8',
-		];
-
-		return wp_mail( $user->user_email, $subject, $message, $headers );
+		return wp_mail( $user->user_email, $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
 	}
 
 	// -------------------------------------------------------------------------
@@ -325,94 +360,4 @@ class ClientFlow_Portal_Auth {
 		return $username;
 	}
 
-	/**
-	 * Build the HTML body for the magic link email.
-	 *
-	 * @param  WP_User $user
-	 * @param  string  $portal_url
-	 * @param  string  $business_name
-	 * @return string
-	 */
-	private static function build_email_html(
-		WP_User $user,
-		string  $portal_url,
-		string  $business_name
-	): string {
-		$name          = esc_html( $user->display_name );
-		$escaped_url   = esc_url( $portal_url );
-		$escaped_biz   = esc_html( $business_name );
-		$expiry_hours  = (int) ( self::TOKEN_TTL / 3600 );
-
-		return <<<HTML
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Your login link</title>
-</head>
-<body style="margin:0;padding:0;background:#F8F7F5;font-family:'DM Sans',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F8F7F5;padding:48px 16px;">
-    <tr>
-      <td align="center">
-        <table width="520" cellpadding="0" cellspacing="0"
-               style="background:#ffffff;border-radius:20px;padding:48px 44px;
-                      box-shadow:0 2px 4px rgba(26,26,46,.04),0 12px 40px rgba(26,26,46,.09);">
-          <tr>
-            <td style="padding-bottom:32px;border-bottom:1px solid #F3F4F6;">
-              <p style="margin:0;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;
-                        color:#9CA3AF;font-weight:600;">{$escaped_biz}</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-top:36px;padding-bottom:12px;">
-              <h1 style="margin:0;font-size:28px;font-weight:700;color:#1A1A2E;
-                         font-family:Georgia,serif;letter-spacing:-0.02em;">
-                Hi {$name},
-              </h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-bottom:32px;">
-              <p style="margin:0;font-size:16px;color:#6B7280;line-height:1.65;">
-                Click the button below to log in to your client portal.
-                No password needed.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-bottom:36px;text-align:center;">
-              <a href="{$escaped_url}"
-                 style="display:inline-block;padding:16px 40px;background:#6366F1;
-                        color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;
-                        border-radius:12px;letter-spacing:0.01em;">
-                Log In to Your Portal
-              </a>
-            </td>
-          </tr>
-          <tr>
-            <td style="border-top:1px solid #F3F4F6;padding-top:28px;">
-              <p style="margin:0;font-size:13px;color:#9CA3AF;line-height:1.6;">
-                This link expires in {$expiry_hours} hours and can only be used once.<br>
-                If you did not request this, you can safely ignore this email.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-top:16px;">
-              <p style="margin:0;font-size:12px;color:#C0C0C8;">
-                Having trouble with the button?
-                Copy and paste this URL into your browser:<br>
-                <a href="{$escaped_url}" style="color:#6366F1;word-break:break-all;">{$escaped_url}</a>
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-HTML;
-	}
 }
