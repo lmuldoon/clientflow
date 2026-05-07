@@ -1020,7 +1020,7 @@ export default function ProposalList( {
 								</button>
 							</>
 						) }
-						{ [ 'draft', 'sent', 'viewed', 'accepted' ].includes( proposal.status ) && (
+						{ proposal.status === 'accepted' && (
 							<button
 								type="button"
 								className="cf-list-action-btn"
