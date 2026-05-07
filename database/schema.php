@@ -2,7 +2,7 @@
 /**
  * ClientFlow Database Schema
  *
- * Creates all 10 ClientFlow tables via dbDelta() on plugin activation.
+ * Creates all 12 ClientFlow tables via dbDelta() on plugin activation.
  * Safe to call multiple times — dbDelta only applies diffs.
  *
  * Tables:
@@ -17,6 +17,7 @@
  *   9.  clientflow_files           — file uploads per project (Agency)
  *   10. clientflow_approvals       — approval workflows (Agency)
  *   11. clientflow_events          — analytics event log
+ *   12. clientflow_team_members    — Agency team seats (member ↔ owner links)
  *
  * @package ClientFlow
  * @since   0.1.0
@@ -125,7 +126,9 @@ function clientflow_create_tables(): void {
 	) $charset_collate;" );
 
 	// Ensure portal_invited_at exists on existing installations.
-	$wpdb->query( "ALTER TABLE {$wpdb->prefix}clientflow_clients ADD COLUMN IF NOT EXISTS portal_invited_at DATETIME DEFAULT NULL" );
+	if ( ! $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$wpdb->prefix}clientflow_clients LIKE %s", 'portal_invited_at' ) ) ) {
+		$wpdb->query( "ALTER TABLE {$wpdb->prefix}clientflow_clients ADD COLUMN portal_invited_at DATETIME DEFAULT NULL" );
+	}
 
 	// ────────────────────────────────────────────────────────────────────────
 	// Table 4: clientflow_proposals
@@ -141,7 +144,7 @@ function clientflow_create_tables(): void {
 
 		token VARCHAR(64) NOT NULL DEFAULT '',
 
-		status ENUM('draft','sent','viewed','accepted','declined','expired','completed') NOT NULL DEFAULT 'draft',
+		status ENUM('draft','sent','viewed','accepted','declined','expired','completed','revision_requested') NOT NULL DEFAULT 'draft',
 
 		total_amount DECIMAL(12,2) DEFAULT NULL,
 		currency VARCHAR(3) NOT NULL DEFAULT 'GBP',
@@ -157,6 +160,8 @@ function clientflow_create_tables(): void {
 		declined_at DATETIME DEFAULT NULL,
 		decline_reason TEXT DEFAULT NULL,
 		deleted_at DATETIME DEFAULT NULL,
+		revision_note TEXT DEFAULT NULL,
+		revision_requested_at DATETIME DEFAULT NULL,
 
 		template_id VARCHAR(50) DEFAULT NULL,
 
@@ -169,12 +174,20 @@ function clientflow_create_tables(): void {
 		KEY template_id (template_id)
 	) $charset_collate;" );
 
-	// Ensure 'completed' status and deleted_at exist on existing installations.
+	// Ensure 'completed' + 'revision_requested' statuses exist on existing installations.
 	$wpdb->query(
 		"ALTER TABLE {$wpdb->prefix}clientflow_proposals
-		 MODIFY COLUMN status ENUM('draft','sent','viewed','accepted','declined','expired','completed') NOT NULL DEFAULT 'draft'"
+		 MODIFY COLUMN status ENUM('draft','sent','viewed','accepted','declined','expired','completed','revision_requested') NOT NULL DEFAULT 'draft'"
 	);
-	$wpdb->query( "ALTER TABLE {$wpdb->prefix}clientflow_proposals ADD COLUMN IF NOT EXISTS deleted_at DATETIME DEFAULT NULL" );
+	if ( ! $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$wpdb->prefix}clientflow_proposals LIKE %s", 'deleted_at' ) ) ) {
+		$wpdb->query( "ALTER TABLE {$wpdb->prefix}clientflow_proposals ADD COLUMN deleted_at DATETIME DEFAULT NULL" );
+	}
+	if ( ! $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$wpdb->prefix}clientflow_proposals LIKE %s", 'revision_note' ) ) ) {
+		$wpdb->query( "ALTER TABLE {$wpdb->prefix}clientflow_proposals ADD COLUMN revision_note TEXT DEFAULT NULL" );
+	}
+	if ( ! $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$wpdb->prefix}clientflow_proposals LIKE %s", 'revision_requested_at' ) ) ) {
+		$wpdb->query( "ALTER TABLE {$wpdb->prefix}clientflow_proposals ADD COLUMN revision_requested_at DATETIME DEFAULT NULL" );
+	}
 
 	// ────────────────────────────────────────────────────────────────────────
 	// Table 5: clientflow_projects
@@ -204,8 +217,10 @@ function clientflow_create_tables(): void {
 		KEY status (status)
 	) $charset_collate;" );
 
-	// Ensure deleted_at exists on existing installations.
-	$wpdb->query( "ALTER TABLE {$wpdb->prefix}clientflow_projects ADD COLUMN IF NOT EXISTS deleted_at DATETIME DEFAULT NULL" );
+	// Ensure deleted_at exists on existing installations (dbDelta adds it for new installs; this covers upgrades).
+	if ( ! $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$wpdb->prefix}clientflow_projects LIKE %s", 'deleted_at' ) ) ) {
+		$wpdb->query( "ALTER TABLE {$wpdb->prefix}clientflow_projects ADD COLUMN deleted_at DATETIME DEFAULT NULL" );
+	}
 
 	// ────────────────────────────────────────────────────────────────────────
 	// Table 6: clientflow_milestones
@@ -269,8 +284,15 @@ function clientflow_create_tables(): void {
 		UNIQUE KEY stripe_session_id (stripe_session_id),
 		KEY proposal_id (proposal_id),
 		KEY owner_id (owner_id),
-		KEY status (status)
+		KEY status (status),
+		KEY proposal_status (proposal_id, status)
 	) $charset_collate;" );
+
+	// Ensure the composite index exists on existing installations.
+	$idx_exists = $wpdb->get_var( "SHOW INDEX FROM {$wpdb->prefix}clientflow_payments WHERE Key_name = 'proposal_status'" );
+	if ( ! $idx_exists ) {
+		$wpdb->query( "ALTER TABLE {$wpdb->prefix}clientflow_payments ADD KEY proposal_status (proposal_id, status)" );
+	}
 
 	// ────────────────────────────────────────────────────────────────────────
 	// Table 8: clientflow_messages
@@ -357,6 +379,60 @@ function clientflow_create_tables(): void {
 		KEY proposal_id (proposal_id),
 		KEY event_type (event_type),
 		KEY timestamp (timestamp)
+	) $charset_collate;" );
+
+	// ────────────────────────────────────────────────────────────────────────
+	// Table 12: clientflow_team_members
+	// Agency-tier team seats. Links team members to the primary account owner.
+	// ────────────────────────────────────────────────────────────────────────
+	dbDelta( "CREATE TABLE {$wpdb->prefix}clientflow_team_members (
+		id             INT NOT NULL AUTO_INCREMENT,
+		owner_id       INT NOT NULL,
+		member_user_id INT NOT NULL,
+		role           ENUM('admin','editor','viewer') NOT NULL DEFAULT 'editor',
+		invited_at     DATETIME DEFAULT NULL,
+		accepted_at    DATETIME DEFAULT NULL,
+
+		PRIMARY KEY  (id),
+		UNIQUE KEY owner_member (owner_id, member_user_id),
+		KEY owner_id (owner_id),
+		KEY member_user_id (member_user_id)
+	) $charset_collate;" );
+
+	// ────────────────────────────────────────────────────────────────────────
+	// Table 13: clientflow_webhooks
+	// Outbound webhook endpoints configured per owner. Pro + Agency tiers.
+	// ────────────────────────────────────────────────────────────────────────
+	dbDelta( "CREATE TABLE {$wpdb->prefix}clientflow_webhooks (
+		id         INT NOT NULL AUTO_INCREMENT,
+		owner_id   INT NOT NULL,
+		url        VARCHAR(500) NOT NULL,
+		events     JSON NOT NULL,
+		secret     VARCHAR(64) NOT NULL DEFAULT '',
+		enabled    TINYINT(1) NOT NULL DEFAULT 1,
+		created_at DATETIME DEFAULT NULL,
+		updated_at DATETIME DEFAULT NULL,
+
+		PRIMARY KEY  (id),
+		KEY owner_id (owner_id),
+		KEY enabled  (enabled)
+	) $charset_collate;" );
+
+	// ────────────────────────────────────────────────────────────────────────
+	// Table 14: clientflow_webhook_logs
+	// Delivery audit log — one row per dispatch attempt.
+	// ────────────────────────────────────────────────────────────────────────
+	dbDelta( "CREATE TABLE {$wpdb->prefix}clientflow_webhook_logs (
+		id            INT NOT NULL AUTO_INCREMENT,
+		webhook_id    INT NOT NULL,
+		event         VARCHAR(50) NOT NULL,
+		response_code SMALLINT DEFAULT NULL,
+		success       TINYINT(1) NOT NULL DEFAULT 0,
+		delivered_at  DATETIME DEFAULT NULL,
+
+		PRIMARY KEY  (id),
+		KEY webhook_id   (webhook_id),
+		KEY delivered_at (delivered_at)
 	) $charset_collate;" );
 
 	update_option( 'clientflow_db_version', defined( 'CLIENTFLOW_DB_VERSION' ) ? CLIENTFLOW_DB_VERSION : '1' );

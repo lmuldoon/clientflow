@@ -243,6 +243,7 @@ class ClientFlow_Project {
 		// Set completed_at when transitioning to completed.
 		if ( ( $update['status'] ?? '' ) === 'completed' ) {
 			$update['completed_at'] = current_time( 'mysql' );
+			do_action( 'cf_project_completed', $id, $owner_id );
 		}
 
 		$update['updated_at'] = current_time( 'mysql' );
@@ -292,11 +293,20 @@ class ClientFlow_Project {
 			return new WP_Error( 'project_not_found', __( 'Project not found.', 'clientflow' ), [ 'status' => 404 ] );
 		}
 
+		$now = current_time( 'mysql' );
+
 		$wpdb->update(
 			self::table(),
-			[ 'deleted_at' => current_time( 'mysql' ) ],
+			[ 'deleted_at' => $now ],
 			[ 'id' => $id, 'owner_id' => $owner_id ],
 			[ '%s' ],
+			[ '%d', '%d' ]
+		);
+
+		// Remove child milestones so they don't orphan in the milestones table.
+		$wpdb->delete(
+			$wpdb->prefix . 'clientflow_milestones',
+			[ 'project_id' => $id, 'owner_id' => $owner_id ],
 			[ '%d', '%d' ]
 		);
 

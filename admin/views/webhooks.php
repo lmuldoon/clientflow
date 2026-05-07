@@ -1,12 +1,11 @@
 <?php
 /**
- * Projects Admin Page
+ * Webhooks Admin Page
  *
- * Outputs the React app mount point for the Projects module.
- * All UI is rendered by the React app (build/projects.js).
+ * Outputs the React app mount point for the Webhooks module.
  *
  * @package ClientFlow
- * @since   0.1.0
+ * @since   0.1.2
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -17,8 +16,8 @@ if ( ! current_user_can( 'manage_clientflow' ) ) {
 	wp_die( esc_html__( 'You do not have permission to access this page.', 'clientflow' ) );
 }
 ?>
-<div class="cf-projects-page">
-	<div id="cf-projects-root">
+<div class="cf-webhooks-page">
+	<div id="cf-webhooks-root">
 		<div id="cf-loading-fallback" style="
 			display: flex;
 			align-items: center;
@@ -34,7 +33,7 @@ if ( ! current_user_can( 'manage_clientflow' ) ) {
 					<path d="M12 2a10 10 0 0 1 10 10" stroke="#6366F1" stroke-width="2.5" stroke-linecap="round"/>
 				</svg>
 				<p style="margin: 0; font-size: 14px;">
-					<?php esc_html_e( 'Loading Projects…', 'clientflow' ); ?>
+					<?php esc_html_e( 'Loading Webhooks…', 'clientflow' ); ?>
 				</p>
 			</div>
 		</div>
@@ -44,7 +43,7 @@ if ( ! current_user_can( 'manage_clientflow' ) ) {
 				from { transform: rotate(0deg); }
 				to   { transform: rotate(360deg); }
 			}
-			#cf-projects-root:not(:empty) > #cf-loading-fallback:not(:only-child) {
+			#cf-webhooks-root:not(:empty) > #cf-loading-fallback:not(:only-child) {
 				display: none;
 			}
 		</style>

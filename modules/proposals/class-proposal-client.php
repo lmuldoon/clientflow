@@ -293,6 +293,70 @@ class ClientFlow_Proposal_Client {
 		);
 
 		self::notify_owner( $proposal['id'], 'declined' );
+		do_action( 'cf_proposal_declined', (int) $proposal['id'], (int) $proposal['owner_id'] );
+
+		return self::get_by_token( $token );
+	}
+
+	/**
+	 * Client requests changes on a sent/viewed proposal.
+	 *
+	 * Sets status to 'revision_requested', stores the client's note, and
+	 * notifies the owner. The owner can then edit the proposal (reverting to
+	 * draft) and re-send it.
+	 *
+	 * @param string $token Public proposal token.
+	 * @param string $note  Optional explanation from the client.
+	 *
+	 * @return array|WP_Error Updated proposal row, or WP_Error on failure.
+	 */
+	public static function request_change( string $token, string $note = '' ): array|WP_Error {
+		global $wpdb;
+
+		$proposal = self::get_by_token( $token );
+		if ( is_wp_error( $proposal ) ) {
+			return $proposal;
+		}
+
+		if ( ! in_array( $proposal['status'], [ 'sent', 'viewed' ], true ) ) {
+			return new WP_Error(
+				'invalid_status',
+				__( 'Changes can only be requested on a proposal that has been sent.', 'clientflow' ),
+				[ 'status' => 422 ]
+			);
+		}
+
+		$now  = current_time( 'mysql' );
+		$note = sanitize_textarea_field( $note );
+
+		$wpdb->update(
+			$wpdb->prefix . 'clientflow_proposals',
+			[
+				'status'                => 'revision_requested',
+				'revision_note'         => '' !== $note ? $note : null,
+				'revision_requested_at' => $now,
+				'updated_at'            => $now,
+			],
+			[ 'id' => $proposal['id'] ],
+			[ '%s', '%s', '%s', '%s' ],
+			[ '%d' ]
+		);
+
+		$wpdb->insert(
+			$wpdb->prefix . 'clientflow_events',
+			[
+				'proposal_id' => $proposal['id'],
+				'event_type'  => 'revision_requested',
+				'user_ip'     => sanitize_text_field( substr( $_SERVER['REMOTE_ADDR'] ?? '', 0, 45 ) ),
+				'user_agent'  => sanitize_text_field( substr( $_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500 ) ),
+				'timestamp'   => $now,
+				'metadata'    => '' !== $note ? wp_json_encode( [ 'note' => $note ] ) : null,
+			],
+			[ '%d', '%s', '%s', '%s', '%s', '%s' ]
+		);
+
+		self::notify_owner( $proposal['id'], 'revision_requested', $note );
+		do_action( 'cf_revision_requested', (int) $proposal['id'], (int) $proposal['owner_id'] );
 
 		return self::get_by_token( $token );
 	}
@@ -339,9 +403,10 @@ class ClientFlow_Proposal_Client {
 	 * Best-effort — failures are silent so they don't block the API response.
 	 *
 	 * @param int    $proposal_id
-	 * @param string $event 'accepted' | 'declined'
+	 * @param string $event 'accepted' | 'declined' | 'revision_requested'
+	 * @param string $note  Optional client note (used for revision_requested).
 	 */
-	private static function notify_owner( int $proposal_id, string $event ): void {
+	private static function notify_owner( int $proposal_id, string $event, string $note = '' ): void {
 		global $wpdb;
 
 		$row = $wpdb->get_row(
@@ -369,6 +434,16 @@ class ClientFlow_Proposal_Client {
 			$body_html = cf_email_html( [
 				'body'      => '<p style="margin:0;font-size:16px;color:#6B7280;line-height:1.65;"><strong style="color:#1A1A2E;">' . esc_html( $client ) . '</strong> has accepted your proposal <em>' . esc_html( $row['title'] ) . '</em>.</p>',
 				'cta_label' => __( 'View Proposal', 'clientflow' ),
+				'cta_url'   => admin_url( 'admin.php?page=clientflow-proposals' ),
+			] );
+		} elseif ( 'revision_requested' === $event ) {
+			$note_html = '' !== $note
+				? '<p style="margin:16px 0 0;font-size:15px;color:#374151;line-height:1.65;background:#F9FAFB;border-left:3px solid #6366F1;padding:12px 16px;border-radius:0 8px 8px 0;"><strong>' . __( 'Their note:', 'clientflow' ) . '</strong> ' . nl2br( esc_html( $note ) ) . '</p>'
+				: '';
+			$subject   = sprintf( __( 'Changes Requested: %s', 'clientflow' ), $row['title'] );
+			$body_html = cf_email_html( [
+				'body'      => '<p style="margin:0;font-size:16px;color:#6B7280;line-height:1.65;"><strong style="color:#1A1A2E;">' . esc_html( $client ) . '</strong> has requested changes on <em>' . esc_html( $row['title'] ) . '</em>.</p>' . $note_html,
+				'cta_label' => __( 'Review & Edit', 'clientflow' ),
 				'cta_url'   => admin_url( 'admin.php?page=clientflow-proposals' ),
 			] );
 		} else {

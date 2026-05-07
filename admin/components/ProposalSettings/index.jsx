@@ -65,17 +65,20 @@ const CSS = `
 .cf-ps-select-wrap {
   position: relative;
 }
-.cf-ps-select-wrap::after {
-  content: '';
-  position: absolute;
-  right: 14px; top: 50%;
-  transform: translateY(-50%);
-  width: 0; height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 5px solid var(--cf-slate-400);
-  pointer-events: none;
+.cf-ps-select-wrap select {
+max-width:unset;
 }
+// .cf-ps-select-wrap::after {
+//   content: '';
+//   position: absolute;
+//   right: 14px; top: 50%;
+//   transform: translateY(-50%);
+//   width: 0; height: 0;
+//   border-left: 5px solid transparent;
+//   border-right: 5px solid transparent;
+//   border-top: 5px solid var(--cf-slate-400);
+//   pointer-events: none;
+// }
 
 /* 2-col row */
 .cf-ps-row {

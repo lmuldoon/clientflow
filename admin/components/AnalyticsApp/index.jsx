@@ -26,6 +26,7 @@ const GLOBAL_CSS = `
   --cf-amber-bg: #FFFBEB;
   --cf-red:      #DC2626;
   --cf-red-bg:   #FEF2F2;
+  --cf-slate-400: 	 #94A3B8;
   --cf-radius:   14px;
   --cf-shadow:   0 1px 4px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.04);
 }
@@ -51,16 +52,18 @@ const GLOBAL_CSS = `
 }
 .cf-an-header h1 {
   font-family: 'Archivo', sans-serif;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 800;
   color: var(--cf-text);
-  margin: 0 0 4px;
+  margin:0;
   letter-spacing: -0.5px;
+  line-height:1;
 }
 .cf-an-header p {
-  margin: 0;
-  font-size: 13.5px;
-  color: var(--cf-muted);
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height:1.5;
+  color: var(--cf-slate-400);
 }
 .cf-an-header-actions {
   display: flex;

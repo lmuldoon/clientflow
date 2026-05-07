@@ -26,13 +26,14 @@ const TABS = [
 ];
 
 const STATUS_CONFIG = {
-	draft:     { bg: 'var(--cf-slate-100)',   color: 'var(--cf-slate-600)',   label: 'Draft'     },
-	sent:      { bg: 'var(--cf-indigo-bg)',   color: 'var(--cf-indigo)',      label: 'Sent'      },
-	viewed:    { bg: 'var(--cf-amber-bg)',    color: 'var(--cf-amber)',       label: 'Viewed'    },
-	accepted:  { bg: 'var(--cf-emerald-bg)',  color: 'var(--cf-emerald)',     label: 'Accepted'  },
-	completed: { bg: 'var(--cf-emerald-bg)',  color: 'var(--cf-emerald)',     label: 'Completed' },
-	declined:  { bg: 'var(--cf-red-bg)',      color: 'var(--cf-red)',         label: 'Declined'  },
-	expired:   { bg: 'var(--cf-slate-100)',   color: 'var(--cf-slate-400)',   label: 'Expired'   },
+	draft:              { bg: 'var(--cf-slate-100)',   color: 'var(--cf-slate-600)',   label: 'Draft'             },
+	sent:               { bg: 'var(--cf-indigo-bg)',   color: 'var(--cf-indigo)',      label: 'Sent'              },
+	viewed:             { bg: 'var(--cf-amber-bg)',    color: 'var(--cf-amber)',       label: 'Viewed'            },
+	accepted:           { bg: 'var(--cf-emerald-bg)',  color: 'var(--cf-emerald)',     label: 'Accepted'          },
+	completed:          { bg: 'var(--cf-emerald-bg)',  color: 'var(--cf-emerald)',     label: 'Completed'         },
+	declined:           { bg: 'var(--cf-red-bg)',      color: 'var(--cf-red)',         label: 'Declined'          },
+	expired:            { bg: 'var(--cf-slate-100)',   color: 'var(--cf-slate-400)',   label: 'Expired'           },
+	revision_requested: { bg: '#FEF3C7',               color: '#92400E',               label: 'Changes Requested' },
 };
 
 const CURRENCY_SYMBOLS = { GBP: '£', USD: '$', EUR: '€', CAD: '$', AUD: '$' };
@@ -41,7 +42,7 @@ const PER_PAGE = 20;
 
 const CSS = `
 /* Layout */
-.cf-list-wrap { display: flex; flex-direction: column; gap: 0; padding: 32px 28px 64px; }
+.cf-list-wrap { display: flex; flex-direction: column; gap: 0; }
 
 /* Header */
 .cf-list-header {
@@ -53,16 +54,18 @@ const CSS = `
 }
 .cf-list-title {
   font-family: var(--cf-font);
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 800;
   color: var(--cf-navy);
   letter-spacing: -.5px;
-  margin: 0 0 4px;
+  margin:0;
+  line-height: 1;
 }
 .cf-list-subtitle {
-  font-size: 13.5px;
-  color: var(--cf-slate-500);
-  margin: 0;
+  font-size: 14px;
+  color: var(--cf-slate-400);
+  margin: 6px 0 0;
+  line-height: 1.5;
 }
 .cf-list-new-btn {
   display: inline-flex; align-items: center; gap: 8px;
@@ -157,12 +160,13 @@ const CSS = `
 }
 .cf-list-search-icon {
   position: absolute;
-  left: 12px; top: 50%;
+  right: 12px; top: 50%;
   transform: translateY(-50%);
   width: 15px; height: 15px;
   stroke: var(--cf-slate-400);
   stroke-width: 2;
   pointer-events: none;
+  display:none;
 }
 .cf-list-search {
   padding: 9px 14px 9px 36px;
@@ -182,7 +186,7 @@ const CSS = `
 /* Table header row */
 .cf-list-col-headers {
   display: grid;
-  grid-template-columns: 2fr 2fr 120px 100px 120px 100px;
+  grid-template-columns: 2fr 2fr 110px 124px 120px 115px;
   gap: 12px;
   padding: 8px 16px;
   font-size: 11px;
@@ -197,7 +201,7 @@ const CSS = `
 /* Row card */
 .cf-list-row {
   display: grid;
-  grid-template-columns: 2fr 2fr 120px 100px 120px 100px;
+  grid-template-columns: 2fr 2fr 110px 124px 120px 115px;
   gap: 12px;
   align-items: center;
   padding: 14px 16px;
@@ -226,10 +230,11 @@ const CSS = `
   background: var(--cf-slate-200);
   transition: background .15s;
 }
-.cf-list-row[data-status="accepted"]::before  { background: var(--cf-emerald); }
-.cf-list-row[data-status="sent"]::before      { background: var(--cf-indigo); }
-.cf-list-row[data-status="viewed"]::before    { background: var(--cf-amber); }
-.cf-list-row[data-status="declined"]::before  { background: var(--cf-red); }
+.cf-list-row[data-status="accepted"]::before           { background: var(--cf-emerald); }
+.cf-list-row[data-status="sent"]::before               { background: var(--cf-indigo); }
+.cf-list-row[data-status="viewed"]::before             { background: var(--cf-amber); }
+.cf-list-row[data-status="declined"]::before           { background: var(--cf-red); }
+.cf-list-row[data-status="revision_requested"]::before { background: #F59E0B; }
 
 /* Client cell */
 .cf-list-client-name { font-size: 13.5px; font-weight: 600; color: var(--cf-slate-800); }
@@ -453,6 +458,166 @@ const CSS = `
 .cf-list-page-btn.active { background: var(--cf-indigo); color: white; border-color: var(--cf-indigo); }
 .cf-list-page-btn:disabled { opacity: .4; cursor: not-allowed; }
 .cf-list-page-btn svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; }
+
+/* ─── Proposal limit banner ──────────────────────────────────────────── */
+.cf-list-limit-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 16px;
+  background: var(--cf-amber-bg); border: 1px solid rgba(245,158,11,.25);
+  border-radius: var(--cf-radius-sm); margin-bottom: 16px;
+  animation: cf-fadein .2s ease both;
+}
+@keyframes cf-fadein { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+.cf-list-limit-banner__left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.cf-list-limit-banner__icon {
+  flex-shrink: 0; width: 32px; height: 32px;
+  background: rgba(245,158,11,.12); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.cf-list-limit-banner__icon svg { stroke: var(--cf-amber); }
+.cf-list-limit-banner__text { min-width: 0; }
+.cf-list-limit-banner__title { font-size: 13px; font-weight: 700; color: var(--cf-navy); white-space: nowrap; }
+.cf-list-limit-banner__sub { font-size: 12px; color: var(--cf-slate-400); margin-top: 1px; }
+.cf-list-limit-banner__btn {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px;
+  height: 32px; padding: 0 14px;
+  font-size: 12px; font-weight: 600; font-family: var(--cf-font);
+  color: #92400E; background: rgba(245,158,11,.1);
+  border: 1.5px solid rgba(245,158,11,.4); border-radius: var(--cf-radius-sm);
+  cursor: pointer; text-decoration: none; white-space: nowrap;
+  transition: background .14s, border-color .14s;
+}
+.cf-list-limit-banner__btn:hover { background: rgba(245,158,11,.18); border-color: rgba(245,158,11,.65); }
+
+/* ─── Send Proposal Modal ────────────────────────────────────────────── */
+.cf-send-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: cf-fade-overlay 0.18s ease both;
+}
+.cf-send-modal {
+  background: var(--cf-white);
+  border-radius: var(--cf-radius);
+  border-left: 3px solid var(--cf-indigo);
+  padding: 28px 32px 32px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: var(--cf-shadow-lg);
+  animation: cf-modal-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.cf-send-modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.cf-send-modal-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--cf-indigo-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.cf-send-modal-icon svg {
+  width: 16px;
+  height: 16px;
+  stroke: var(--cf-indigo);
+  stroke-width: 2;
+}
+.cf-send-modal-title {
+  font-family: var(--cf-font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--cf-navy);
+  margin-bottom: 3px;
+  line-height: 1.3;
+}
+.cf-send-modal-subtitle {
+  font-size: 12.5px;
+  color: var(--cf-slate-400);
+}
+.cf-send-modal-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.cf-send-modal-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--cf-slate-500);
+  margin-bottom: 6px;
+}
+.cf-send-modal-input {
+  width: 100%;
+  padding: 10px 13px;
+  border: var(--cf-input-border);
+  border-radius: var(--cf-radius-sm);
+  font-size: 13.5px;
+  font-family: var(--cf-font);
+  color: var(--cf-slate-800);
+  background: var(--cf-white);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  box-sizing: border-box;
+}
+.cf-send-modal-input::placeholder { color: var(--cf-slate-300); }
+.cf-send-modal-input:focus {
+  border-color: var(--cf-indigo);
+  box-shadow: var(--cf-input-focus);
+}
+.cf-send-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.cf-send-modal-cancel {
+  padding: 9px 18px;
+  border-radius: var(--cf-radius-sm);
+  border: 1.5px solid var(--cf-slate-200);
+  background: var(--cf-white);
+  font-family: var(--cf-font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cf-slate-600);
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.cf-send-modal-cancel:hover { background: var(--cf-slate-50); border-color: var(--cf-slate-300); color: var(--cf-slate-800); }
+.cf-send-modal-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  background: var(--cf-indigo);
+  color: white;
+  border: none;
+  border-radius: var(--cf-radius-sm);
+  font-family: var(--cf-font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(99,102,241,.3);
+  transition: background .12s, box-shadow .12s, opacity .12s;
+}
+.cf-send-modal-submit:hover:not(:disabled) { background: #4F46E5; box-shadow: 0 4px 12px rgba(99,102,241,.4); }
+.cf-send-modal-submit:disabled { opacity: .6; cursor: not-allowed; }
+.cf-send-modal-submit svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2.5; }
 `;
 
 function injectStyles( id, css ) {
@@ -498,6 +663,12 @@ export default function ProposalList( {
 } ) {
 	injectStyles( 'cf-list-styles', CSS );
 
+	const proposalLimit     = window.cfData?.planLimits?.proposals ?? null;
+	const proposalUsage     = window.cfData?.proposalUsage ?? 0;
+	const proposalNextReset = window.cfData?.proposalNextReset ?? '';
+	const isAtLimit         = proposalLimit !== null && proposalUsage >= proposalLimit;
+	const settingsUrl       = ( window.cfData?.adminUrl || '/wp-admin/' ) + 'admin.php?page=clientflow-settings';
+
 	const [ activeTab, setActiveTab ]         = useState( 'all' );
 	const [ search, setSearch ]               = useState( '' );
 	const [ page, setPage ]                   = useState( 1 );
@@ -505,6 +676,7 @@ export default function ProposalList( {
 	const [ sendingId, setSendingId ]         = useState( null );
 	const [ refreshing, setRefreshing ]       = useState( false );
 	const [ declineReason, setDeclineReason ] = useState( null ); // { title, reason }
+	const [ sendModal, setSendModal ]         = useState( { open: false, proposal: null, email: '', subject: '' } );
 
 	async function handleRefresh() {
 		setRefreshing( true );
@@ -571,17 +743,27 @@ export default function ProposalList( {
 		}
 	}
 
-	async function handleSend( proposal ) {
-		const email = proposal.client_email || window.prompt(
-			'Enter client email address to send to:',
-			''
-		);
-		if ( ! email ) return;
+	function handleSend( proposal ) {
+		const defaultSubject = proposal.title
+			? `You have received a proposal: ${ proposal.title }`
+			: 'You have a new proposal to review';
+		setSendModal( {
+			open:     true,
+			proposal,
+			email:    proposal.client_email || '',
+			subject:  defaultSubject,
+		} );
+	}
+
+	async function handleModalSend() {
+		const { proposal, email, subject } = sendModal;
+		if ( ! email.trim() ) return;
+		setSendModal( m => ( { ...m, open: false } ) );
 		setSendingId( proposal.id );
 		try {
 			await cfFetch( `proposals/${ proposal.id }/send`, {
 				method: 'POST',
-				body: JSON.stringify( { client_email: email } ),
+				body:   JSON.stringify( { client_email: email.trim(), email_subject: subject.trim() } ),
 			} );
 			onRefresh();
 		} catch ( e ) {
@@ -635,7 +817,14 @@ export default function ProposalList( {
 						</svg>
 						Refresh
 					</button>
-					<button type="button" className="cf-list-new-btn" onClick={ onNewProposal }>
+					<button
+						type="button"
+						className="cf-list-new-btn"
+						onClick={ isAtLimit ? undefined : onNewProposal }
+						disabled={ isAtLimit }
+						title={ isAtLimit ? `Limit reached — resets on ${ proposalNextReset }` : undefined }
+						style={ isAtLimit ? { opacity: 0.45, cursor: 'not-allowed' } : undefined }
+					>
 						<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
 							<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
 						</svg>
@@ -650,6 +839,28 @@ export default function ProposalList( {
 						<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
 					</svg>
 					{ error }
+				</div>
+			) }
+
+			{ isAtLimit && (
+				<div className="cf-list-limit-banner">
+					<div className="cf-list-limit-banner__left">
+						<div className="cf-list-limit-banner__icon">
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+								<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+							</svg>
+						</div>
+						<div className="cf-list-limit-banner__text">
+							<div className="cf-list-limit-banner__title">{ proposalUsage }/{ proposalLimit } proposals used this month</div>
+							<div className="cf-list-limit-banner__sub">Resets on { proposalNextReset } — upgrade for unlimited proposals</div>
+						</div>
+					</div>
+					<a href={ settingsUrl } className="cf-list-limit-banner__btn">
+						<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+							<polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/>
+						</svg>
+						Upgrade to Pro
+					</a>
 				</div>
 			) }
 
@@ -748,7 +959,19 @@ export default function ProposalList( {
 								</svg>
 							</button>
 						) }
-						{ [ 'draft', 'declined', 'expired' ].includes( proposal.status ) && (
+						{ proposal.status === 'revision_requested' && proposal.revision_note && (
+							<button
+								type="button"
+								className="cf-list-action-btn"
+								title="View client note"
+								onClick={ () => setDeclineReason( { title: proposal.title, reason: proposal.revision_note, isRevision: true } ) }
+							>
+								<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+									<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+								</svg>
+							</button>
+						) }
+						{ [ 'draft', 'declined', 'expired', 'revision_requested' ].includes( proposal.status ) && (
 							<>
 								{ proposal.status === 'draft' && (
 									<button
@@ -855,7 +1078,7 @@ export default function ProposalList( {
 							? <>New to ClientFlow? <a href="admin.php?page=clientflow-setup" style={ { color: 'var(--cf-indigo)' } }>Complete your setup</a> then create your first proposal.</>
 							: 'Create your first proposal to get started.' }
 					</p>
-					{ ! search && activeTab === 'all' && (
+					{ ! search && activeTab === 'all' && ! isAtLimit && (
 						<button type="button" className="cf-list-new-btn" onClick={ onNewProposal } style={ { marginTop: 8 } }>
 							<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round" style={ { width: 15, height: 15, stroke: 'currentColor', strokeWidth: 2.5 } }>
 								<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -918,6 +1141,78 @@ export default function ProposalList( {
 				</div>
 			) }
 
+			{ sendModal.open && (
+				<div
+					className="cf-send-overlay"
+					onClick={ e => { if ( e.target === e.currentTarget ) setSendModal( m => ( { ...m, open: false } ) ); } }
+					role="dialog"
+					aria-modal="true"
+					aria-labelledby="cf-send-modal-title"
+				>
+					<div className="cf-send-modal">
+						<div className="cf-send-modal-header">
+							<div className="cf-send-modal-icon">
+								<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+									<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+								</svg>
+							</div>
+							<div>
+								<div className="cf-send-modal-title" id="cf-send-modal-title">Send Proposal</div>
+								<div className="cf-send-modal-subtitle">{ sendModal.proposal?.title || 'Untitled Proposal' }</div>
+							</div>
+						</div>
+
+						<div className="cf-send-modal-fields">
+							<div>
+								<label className="cf-send-modal-label" htmlFor="cf-send-email">Client Email</label>
+								<input
+									id="cf-send-email"
+									type="email"
+									className="cf-send-modal-input"
+									placeholder="client@example.com"
+									value={ sendModal.email }
+									onChange={ e => setSendModal( m => ( { ...m, email: e.target.value } ) ) }
+									autoFocus
+								/>
+							</div>
+							<div>
+								<label className="cf-send-modal-label" htmlFor="cf-send-subject">Email Subject</label>
+								<input
+									id="cf-send-subject"
+									type="text"
+									className="cf-send-modal-input"
+									placeholder="Email subject line"
+									value={ sendModal.subject }
+									onChange={ e => setSendModal( m => ( { ...m, subject: e.target.value } ) ) }
+									onKeyDown={ e => { if ( e.key === 'Enter' && sendModal.email.trim() ) handleModalSend(); } }
+								/>
+							</div>
+						</div>
+
+						<div className="cf-send-modal-actions">
+							<button
+								type="button"
+								className="cf-send-modal-cancel"
+								onClick={ () => setSendModal( m => ( { ...m, open: false } ) ) }
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								className="cf-send-modal-submit"
+								disabled={ ! sendModal.email.trim() }
+								onClick={ handleModalSend }
+							>
+								<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+									<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+								</svg>
+								Send Proposal
+							</button>
+						</div>
+					</div>
+				</div>
+			) }
+
 			{ declineReason && (
 				<div
 					className="cf-decline-overlay"
@@ -929,12 +1224,21 @@ export default function ProposalList( {
 					<div className="cf-decline-modal">
 						<div className="cf-decline-modal-header">
 							<div className="cf-decline-modal-icon">
-								<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
-									<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-								</svg>
+								{ declineReason.isRevision ? (
+									<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+										<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+										<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+									</svg>
+								) : (
+									<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+										<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+									</svg>
+								) }
 							</div>
 							<div className="cf-decline-modal-titles">
-								<div className="cf-decline-modal-title" id="cf-decline-modal-title">Client's Decline Reason</div>
+								<div className="cf-decline-modal-title" id="cf-decline-modal-title">
+									{ declineReason.isRevision ? "Client's Change Request" : "Client's Decline Reason" }
+								</div>
 								<div className="cf-decline-modal-subtitle">{ declineReason.title }</div>
 							</div>
 						</div>

@@ -680,6 +680,56 @@ const CSS = `
   animation: cf-pd-spin .8s linear infinite;
 }
 @keyframes cf-pd-spin { to { transform: rotate(360deg); } }
+
+/* ─── Agency lock badge on tabs ─────────────────────────────────────── */
+.cf-pd-tab-agency-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 100px;
+  background: var(--cf-amber-bg); border: 1px solid rgba(245,158,11,.22);
+  color: var(--cf-amber); margin-left: 5px; line-height: 1; flex-shrink: 0;
+}
+.cf-pd-tab-agency-badge svg { width: 9px; height: 9px; stroke: currentColor; stroke-width: 2.5; fill: none; flex-shrink: 0; }
+
+/* ─── Upgrade panel ──────────────────────────────────────────────────── */
+.cf-pd-upgrade-panel {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; min-height: 240px; padding: 48px 24px; text-align: center;
+  animation: cf-pd-enter .22s ease both;
+}
+.cf-pd-upgrade-icon {
+  width: 58px; height: 58px;
+  background: var(--cf-amber-bg); border: 1.5px solid rgba(245,158,11,.28);
+  border-radius: 16px; display: flex; align-items: center; justify-content: center;
+  margin-bottom: 6px;
+}
+.cf-pd-upgrade-title { font-size: 15px; font-weight: 700; color: #1A1A2E; margin: 0; letter-spacing: -.01em; }
+.cf-pd-upgrade-desc  { font-size: 13px; color: var(--cf-slate-400); margin: 0; max-width: 300px; line-height: 1.65; }
+.cf-pd-upgrade-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 38px; padding: 0 20px; margin-top: 6px;
+  background: var(--cf-amber); color: #fff; border: none; border-radius: 9px;
+  font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; text-decoration: none;
+  box-shadow: 0 2px 8px rgba(245,158,11,.3);
+  transition: background .15s, box-shadow .15s, transform .1s;
+}
+.cf-pd-upgrade-btn:hover { background: #D97706; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(245,158,11,.4); }
+.cf-pd-upgrade-btn:active { transform: none; }
+
+/* ─── Milestone agency note ──────────────────────────────────────────── */
+.cf-pd-ms-agency-note {
+  display: flex; align-items: center; gap: 8px;
+  padding: 13px 15px;
+  background: var(--cf-amber-bg); border: 1px solid rgba(245,158,11,.2); border-radius: 10px;
+  font-size: 13px; color: #6B7280; margin-top: 8px;
+}
+.cf-pd-ms-agency-note svg { flex-shrink: 0; stroke: var(--cf-amber); fill: none; }
+.cf-pd-ms-agency-inline-badge {
+  display: inline-flex; align-items: center;
+  font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 100px;
+  background: rgba(245,158,11,.15); color: var(--cf-amber); margin-left: 2px;
+}
 `;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -702,6 +752,29 @@ function statusClass( status ) {
 	if ( status === 'on-hold' )   return 'cf-pd-status-on-hold';
 	if ( status === 'completed' ) return 'cf-pd-status-completed';
 	return 'cf-pd-status-active';
+}
+
+// ── Agency upgrade panel ───────────────────────────────────────────────────────
+
+function AgencyUpgradePanel( { description } ) {
+	const settingsUrl = ( window.cfData?.adminUrl || '/wp-admin/' ) + 'admin.php?page=clientflow-settings';
+	return (
+		<div className="cf-pd-upgrade-panel">
+			<div className="cf-pd-upgrade-icon">
+				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--cf-amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+					<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+				</svg>
+			</div>
+			<p className="cf-pd-upgrade-title">Agency Feature</p>
+			<p className="cf-pd-upgrade-desc">{ description }</p>
+			<a href={ settingsUrl } className="cf-pd-upgrade-btn">
+				<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+					<polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/>
+				</svg>
+				Upgrade to Agency
+			</a>
+		</div>
+	);
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -899,6 +972,8 @@ export default function ProjectDetail( { projectId, onBack } ) {
 		paymentData.remaining === null || paymentData.remaining <= 0
 	);
 
+	const isProPlan = window.cfData?.userPlan === 'pro';
+
 	// ── Render ───────────────────────────────────────────────────────────
 
 	return (
@@ -969,6 +1044,12 @@ export default function ProjectDetail( { projectId, onBack } ) {
 				>
 					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
 					Files
+					{ isProPlan && (
+						<span className="cf-pd-tab-agency-badge">
+							<svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+							Agency
+						</span>
+					) }
 				</button>
 				<button
 					role="tab"
@@ -978,6 +1059,12 @@ export default function ProjectDetail( { projectId, onBack } ) {
 				>
 					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
 					Approvals
+					{ isProPlan && (
+						<span className="cf-pd-tab-agency-badge">
+							<svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+							Agency
+						</span>
+					) }
 				</button>
 				<button
 					role="tab"
@@ -988,6 +1075,12 @@ export default function ProjectDetail( { projectId, onBack } ) {
 					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
 					Messages
 					{ messagesUnread > 0 && <span className="cf-pd-tab-badge">{ messagesUnread }</span> }
+					{ isProPlan && (
+						<span className="cf-pd-tab-agency-badge">
+							<svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+							Agency
+						</span>
+					) }
 				</button>
 			</div>
 
@@ -1017,7 +1110,7 @@ export default function ProjectDetail( { projectId, onBack } ) {
 
 						{ /* Add form */ }
 						<p className="cf-pd-section-label">Milestones</p>
-						{ ! isLocked && (
+						{ ! isLocked && ! isProPlan && (
 							<form className="cf-pd-add-form" onSubmit={ handleAddMilestone }>
 								<input
 									className="cf-pd-add-input"
@@ -1039,7 +1132,15 @@ export default function ProjectDetail( { projectId, onBack } ) {
 
 						{ /* Milestone list */ }
 						<div className="cf-pd-ms-list">
-							{ milestones.length === 0 ? (
+							{ isProPlan ? (
+								<div className="cf-pd-ms-agency-note">
+									<svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+										<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+									</svg>
+									Milestone tracking is an Agency feature.
+									<span className="cf-pd-ms-agency-inline-badge">Agency</span>
+								</div>
+							) : milestones.length === 0 ? (
 								<div className="cf-pd-ms-empty">No milestones yet — add one above.</div>
 							) : (
 								milestones.map( ( m, idx ) => (
@@ -1138,7 +1239,10 @@ export default function ProjectDetail( { projectId, onBack } ) {
 						role="tabpanel"
 						className={ `cf-pd-tab-panel${ activeTab === 'files' ? ' cf-pd-tab-active' : '' }` }
 					>
-						{ tabsVisited.files && <ProjectFiles projectId={ projectId } /> }
+						{ isProPlan
+							? <AgencyUpgradePanel description="Share deliverables and project assets directly with your client." />
+							: tabsVisited.files && <ProjectFiles projectId={ projectId } />
+						}
 					</div>
 
 					{ /* Approvals panel */ }
@@ -1146,7 +1250,10 @@ export default function ProjectDetail( { projectId, onBack } ) {
 						role="tabpanel"
 						className={ `cf-pd-tab-panel${ activeTab === 'approvals' ? ' cf-pd-tab-active' : '' }` }
 					>
-						{ tabsVisited.approvals && <ProjectApprovals projectId={ projectId } isLocked={ isLocked } /> }
+						{ isProPlan
+							? <AgencyUpgradePanel description="Collect client sign-offs and feedback on your work." />
+							: tabsVisited.approvals && <ProjectApprovals projectId={ projectId } isLocked={ isLocked } />
+						}
 					</div>
 
 					{ /* Messages panel */ }
@@ -1154,12 +1261,15 @@ export default function ProjectDetail( { projectId, onBack } ) {
 						role="tabpanel"
 						className={ `cf-pd-tab-panel${ activeTab === 'messages' ? ' cf-pd-tab-active' : '' }` }
 					>
-						{ tabsVisited.messages && (
-							<ProjectMessages
-								projectId={ projectId }
-								onUnreadChange={ count => setMessagesUnread( count ) }
-							/>
-						) }
+						{ isProPlan
+							? <AgencyUpgradePanel description="Keep all client communication in one place." />
+							: tabsVisited.messages && (
+								<ProjectMessages
+									projectId={ projectId }
+									onUnreadChange={ count => setMessagesUnread( count ) }
+								/>
+							)
+						}
 					</div>
 
 				</div>

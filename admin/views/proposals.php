@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Security: ensure the user has access.
-if ( ! current_user_can( 'manage_options' ) ) {
+if ( ! current_user_can( 'manage_clientflow' ) ) {
 	wp_die( esc_html__( 'You do not have permission to access this page.', 'clientflow' ) );
 }
 ?>

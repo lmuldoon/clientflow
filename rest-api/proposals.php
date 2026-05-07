@@ -108,11 +108,17 @@ add_action( 'rest_api_init', static function (): void {
 		'callback'            => 'cf_rest_send_proposal',
 		'permission_callback' => 'cf_rest_require_auth',
 		'args'                => [
-			'id'           => [ 'type' => 'integer', 'required' => true ],
-			'client_email' => [
+			'id'            => [ 'type' => 'integer', 'required' => true ],
+			'client_email'  => [
 				'type'              => 'string',
 				'required'          => false,
 				'sanitize_callback' => 'sanitize_email',
+			],
+			'email_subject' => [
+				'type'              => 'string',
+				'required'          => false,
+				'default'           => '',
+				'sanitize_callback' => 'sanitize_text_field',
 			],
 		],
 	] );
@@ -195,7 +201,7 @@ function cf_proposal_update_args(): array {
  * Returns templates available for the current user's plan.
  */
 function cf_rest_list_templates( WP_REST_Request $request ): WP_REST_Response {
-	$user_id  = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$plan     = ClientFlow_Entitlements::get_user_plan( $user_id );
 	$all      = ClientFlow_Proposal_Template::all();
 
@@ -215,7 +221,7 @@ function cf_rest_list_templates( WP_REST_Request $request ): WP_REST_Response {
  * Create a proposal from the wizard payload.
  */
 function cf_rest_create_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$payload = $request->get_params();
 
 	$result = ClientFlow_Proposal_Handlers::create_from_wizard( $user_id, $payload );
@@ -233,7 +239,7 @@ function cf_rest_create_proposal( WP_REST_Request $request ): WP_REST_Response|W
  * List the current user's proposals.
  */
 function cf_rest_list_proposals( WP_REST_Request $request ): WP_REST_Response {
-	$user_id = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 
 	$result = ClientFlow_Proposal::list( $user_id, [
 		'status'   => $request->get_param( 'status' ),
@@ -253,7 +259,7 @@ function cf_rest_list_proposals( WP_REST_Request $request ): WP_REST_Response {
  * Get a single proposal.
  */
 function cf_rest_get_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 
 	$result = ClientFlow_Proposal::get( $id, $user_id );
@@ -271,7 +277,7 @@ function cf_rest_get_proposal( WP_REST_Request $request ): WP_REST_Response|WP_E
  * Update an existing proposal.
  */
 function cf_rest_update_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 
 	$data = array_filter(
@@ -279,6 +285,60 @@ function cf_rest_update_proposal( WP_REST_Request $request ): WP_REST_Response|W
 		static fn( $k ) => in_array( $k, [ 'title', 'content', 'status', 'currency', 'expiry_date', 'total_amount', 'client_id' ], true ),
 		ARRAY_FILTER_USE_KEY
 	);
+
+	if ( isset( $data['status'] ) ) {
+		global $wpdb;
+		$current_status = (string) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT status FROM {$wpdb->prefix}clientflow_proposals WHERE id = %d AND owner_id = %d",
+				$id,
+				$user_id
+			)
+		);
+
+		// Valid forward transitions only — no rolling back terminal states.
+		$allowed_from = [
+			'draft'              => [ 'declined', 'expired', 'completed', 'revision_requested' ],
+			'sent'               => [ 'declined', 'expired', 'completed' ],
+			'viewed'             => [ 'declined', 'expired', 'completed' ],
+			'accepted'           => [ 'completed' ],
+			'revision_requested' => [ 'draft', 'declined', 'expired' ],
+			'declined'           => [],
+			'expired'            => [],
+			'completed'          => [],
+		];
+
+		$blocked = $allowed_from[ $current_status ] ?? [];
+		if ( in_array( $data['status'], $blocked, true ) || ( $current_status !== $data['status'] && in_array( $current_status, [ 'declined', 'expired', 'completed' ], true ) ) ) {
+			return new WP_Error(
+				'invalid_status_transition',
+				sprintf(
+					/* translators: 1: current status, 2: requested status */
+					__( 'Cannot change proposal status from "%1$s" to "%2$s".', 'clientflow' ),
+					$current_status,
+					$data['status']
+				),
+				[ 'status' => 422 ]
+			);
+		}
+
+		// Proposals with a linked project must be completed through the project, not directly.
+		if ( 'completed' === $data['status'] && cf_can_user( $user_id, 'use_projects' ) ) {
+			$has_project = (bool) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$wpdb->prefix}clientflow_projects WHERE proposal_id = %d LIMIT 1",
+					$id
+				)
+			);
+			if ( $has_project ) {
+				return new WP_Error(
+					'use_project_to_complete',
+					__( 'This proposal has a linked project. Mark the project as complete in the Projects section to close this proposal.', 'clientflow' ),
+					[ 'status' => 422 ]
+				);
+			}
+		}
+	}
 
 	$result = ClientFlow_Proposal::update( $id, $user_id, $data );
 
@@ -302,11 +362,17 @@ function cf_rest_update_proposal( WP_REST_Request $request ): WP_REST_Response|W
  * Mark a proposal as sent and email the client.
  */
 function cf_rest_send_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id      = get_current_user_id();
-	$id           = (int) $request->get_param( 'id' );
-	$client_email = (string) ( $request->get_param( 'client_email' ) ?? '' );
+	$user_id = cf_get_owner_id( get_current_user_id() );
 
-	$result = ClientFlow_Proposal_Handlers::send_to_client( $id, $user_id, $client_email );
+	if ( ! cf_rest_rate_limit( 'send_proposal', $user_id, 20 ) ) {
+		return new WP_Error( 'rate_limited', __( 'Too many requests. Please wait a moment.', 'clientflow' ), [ 'status' => 429 ] );
+	}
+
+	$id            = (int) $request->get_param( 'id' );
+	$client_email  = (string) ( $request->get_param( 'client_email' ) ?? '' );
+	$email_subject = (string) ( $request->get_param( 'email_subject' ) ?? '' );
+
+	$result = ClientFlow_Proposal_Handlers::send_to_client( $id, $user_id, $client_email, $email_subject );
 
 	if ( is_wp_error( $result ) ) {
 		return $result;
@@ -321,7 +387,7 @@ function cf_rest_send_proposal( WP_REST_Request $request ): WP_REST_Response|WP_
  * Update an existing proposal using the full wizard payload.
  */
 function cf_rest_update_wizard_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 	$payload = $request->get_params();
 
@@ -340,7 +406,7 @@ function cf_rest_update_wizard_proposal( WP_REST_Request $request ): WP_REST_Res
  * Duplicate a proposal.
  */
 function cf_rest_duplicate_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 
 	$new_id = ClientFlow_Proposal::duplicate( $id, $user_id );
@@ -364,7 +430,7 @@ function cf_rest_duplicate_proposal( WP_REST_Request $request ): WP_REST_Respons
  * Delete a proposal.
  */
 function cf_rest_delete_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 
 	$result = ClientFlow_Proposal::delete( $id, $user_id );

@@ -116,11 +116,12 @@ const CSS = `
 }
 .cf-cl-search-icon {
   position: absolute;
-  left: 12px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--cl-slate4);
   pointer-events: none;
+  display:none;
 }
 .cf-cl-search {
   width: 100%;

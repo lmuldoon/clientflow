@@ -97,7 +97,7 @@ add_action( 'rest_api_init', static function (): void {
 // ── Admin handlers ────────────────────────────────────────────────────────────
 
 function cf_rest_list_approvals( WP_REST_Request $request ): WP_REST_Response {
-	$owner_id   = get_current_user_id();
+	$owner_id   = cf_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 	$approvals  = ClientFlow_Approval::list( $project_id, $owner_id );
 
@@ -105,7 +105,7 @@ function cf_rest_list_approvals( WP_REST_Request $request ): WP_REST_Response {
 }
 
 function cf_rest_create_approval( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$owner_id   = get_current_user_id();
+	$owner_id   = cf_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 
 	$lock_error = cf_project_lock_check( $project_id, $owner_id );

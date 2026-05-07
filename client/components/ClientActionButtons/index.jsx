@@ -144,6 +144,41 @@ const CSS = `
 .cfa-status--declined { color: #94A3B8; }
 .cfa-status--expired  { color: #9CA3AF; }
 
+/* Request a change: amber ghost */
+.cfa-btn--revision {
+	background: transparent;
+	color: #D97706;
+	border-color: #D97706;
+	padding: 10px 20px;
+}
+.cfa-btn--revision:hover:not(:disabled) { background: #FFFBEB; }
+
+/* Revision modal accent */
+.cfa-modal--revision {
+	border-left-color: #F59E0B;
+}
+.cfa-modal--revision .cfa-modal-icon {
+	background: #FFFBEB;
+}
+.cfa-modal--revision .cfa-modal-icon svg {
+	stroke: #D97706;
+}
+.cfa-modal--revision .cfa-modal-textarea:focus {
+	border-color: #F59E0B;
+	box-shadow: 0 0 0 3px rgba(245,158,11,0.12);
+}
+.cfa-modal--revision .cfa-modal-btn--confirm {
+	background: #F59E0B;
+	box-shadow: 0 2px 8px rgba(245,158,11,.3);
+}
+.cfa-modal--revision .cfa-modal-btn--confirm:hover {
+	background: #D97706;
+	box-shadow: 0 4px 14px rgba(245,158,11,.4);
+}
+
+/* revision_requested status label */
+.cfa-status--revision { color: #D97706; }
+
 /* ── Mobile ─────────────────────────────────────────────────── */
 @media (max-width: 600px) {
 	.cfa-bar {
@@ -394,14 +429,82 @@ function DeclineModal( { onConfirm, onCancel } ) {
 	);
 }
 
-export default function ClientActionButtons( { status, paymentEnabled, hasPaid, remainingBalance, ownerEmail, onAccept, onDecline, onPayment, loading } ) {
+function RevisionModal( { onConfirm, onCancel } ) {
+	const [ note, setNote ] = useState( '' );
+
+	return (
+		<div
+			className="cfa-modal-overlay"
+			onClick={ e => { if ( e.target === e.currentTarget ) onCancel(); } }
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="cfa-revision-title"
+		>
+			<div className="cfa-modal cfa-modal--revision">
+				<div className="cfa-modal-icon">
+					<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+						<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+						<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+					</svg>
+				</div>
+
+				<h2 className="cfa-modal-title" id="cfa-revision-title">
+					Request a Change
+				</h2>
+				<p className="cfa-modal-subtitle">
+					Let the sender know what you'd like amended. They'll be notified and can update the proposal before you decide.
+				</p>
+
+				<label className="cfa-modal-label" htmlFor="cfa-revision-note">
+					Your note <span className="cfa-modal-optional">(optional)</span>
+				</label>
+				<textarea
+					id="cfa-revision-note"
+					className="cfa-modal-textarea"
+					value={ note }
+					onChange={ e => setNote( e.target.value ) }
+					placeholder="e.g. Could you adjust the timeline on phase 2 and add a monthly retainer option?"
+					rows={ 3 }
+				/>
+
+				<div className="cfa-modal-actions">
+					<button
+						type="button"
+						className="cfa-modal-btn cfa-modal-btn--cancel"
+						onClick={ onCancel }
+					>
+						Cancel
+					</button>
+					<button
+						type="button"
+						className="cfa-modal-btn cfa-modal-btn--confirm"
+						onClick={ () => onConfirm( note.trim() ) }
+					>
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+							<polyline points="20 6 9 17 4 12"/>
+						</svg>
+						Submit Request
+					</button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+export default function ClientActionButtons( { status, paymentEnabled, hasPaid, remainingBalance, ownerEmail, onAccept, onDecline, onRequestChange, onPayment, loading } ) {
 	injectStyles( 'cf-actions-s', CSS );
 
 	const [ showModal, setShowModal ] = useState( false );
+	const [ showRevisionModal, setShowRevisionModal ] = useState( false );
 
 	function handleDeclineConfirm( reason ) {
 		setShowModal( false );
 		onDecline( reason );
+	}
+
+	function handleRevisionConfirm( note ) {
+		setShowRevisionModal( false );
+		onRequestChange( note );
 	}
 
 	const hasRemainingBalance = remainingBalance > 0;
@@ -438,6 +541,15 @@ export default function ClientActionButtons( { status, paymentEnabled, hasPaid, 
 							This proposal has expired
 						</span>
 					) }
+					{ status === 'revision_requested' && (
+						<span className="cfa-status cfa-status--revision">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+								<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+								<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+							</svg>
+							Changes Requested
+						</span>
+					) }
 					{ status === 'completed' && (
 						<span className="cfa-status cfa-status--accepted">
 							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -459,6 +571,12 @@ export default function ClientActionButtons( { status, paymentEnabled, hasPaid, 
 					onCancel={ () => setShowModal( false ) }
 				/>
 			) }
+			{ showRevisionModal && (
+				<RevisionModal
+					onConfirm={ handleRevisionConfirm }
+					onCancel={ () => setShowRevisionModal( false ) }
+				/>
+			) }
 
 			<div className="cfa-bar">
 				<a href={ `mailto:${ ownerEmail || '' }` } className="cfa-contact">Questions? Contact us</a>
@@ -474,6 +592,21 @@ export default function ClientActionButtons( { status, paymentEnabled, hasPaid, 
 							>
 								Decline
 							</button>
+
+							{ ( status === 'sent' || status === 'viewed' ) && (
+								<button
+									className="cfa-btn cfa-btn--revision"
+									onClick={ () => setShowRevisionModal( true ) }
+									disabled={ loading }
+									aria-label="Request a change to this proposal"
+								>
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+										<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+										<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+									</svg>
+									Request a Change
+								</button>
+							) }
 
 							<button
 								className="cfa-btn cfa-btn--accept"

@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-if ( ! current_user_can( 'manage_options' ) ) {
+if ( ! current_user_can( 'manage_clientflow' ) ) {
 	wp_die( esc_html__( 'You do not have permission to access this page.', 'clientflow' ) );
 }
 ?>

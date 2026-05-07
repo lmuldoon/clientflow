@@ -72,7 +72,7 @@ $features = [
 		'key'     => 'create_proposal',
 		'label'   => 'Proposals',
 		'icon'    => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>',
-		'note'    => 'free' === $user_plan ? '5 max (lifetime)' : 'Unlimited',
+		'note'    => 'free' === $user_plan ? '3 per month' : 'Unlimited',
 		'gate'    => 'all',
 	],
 	[
@@ -170,8 +170,7 @@ $upgrade_url = admin_url( 'admin.php?page=clientflow-upgrade' );
 #cf-admin-wrap *, #cf-admin-wrap *::before, #cf-admin-wrap *::after {
     box-sizing: border-box;
 }
-#cf-admin-wrap h1, #cf-admin-wrap h2, #cf-admin-wrap h3, #cf-admin-wrap h4,
-#cf-admin-wrap p, #cf-admin-wrap ul, #cf-admin-wrap li {
+#cf-admin-wrap h2, #cf-admin-wrap h3, #cf-admin-wrap h4, #cf-admin-wrap ul, #cf-admin-wrap li {
     margin: 0; padding: 0; font-size: inherit; font-weight: inherit;
     color: inherit; line-height: inherit;
 }
@@ -194,16 +193,17 @@ $upgrade_url = admin_url( 'admin.php?page=clientflow-upgrade' );
 .cf-brand-icon { display: none; }
 .cf-brand-name {
     font-family: 'Archivo', -apple-system, sans-serif;
-    font-size: 26px;
+    font-size: 28px;
     font-weight: 800;
     color: var(--navy);
     letter-spacing: -0.5px;
-    margin: 0 0 4px;
+    line-height: 1;
+    margin: 0;
 }
 .cf-brand-tagline {
-    font-size: 13.5px;
+    font-size: 14px;
     color: var(--slate-400);
-    margin: 0;
+    margin: 6px 0 0;
 }
 .cf-header-right {
     display: flex;
@@ -300,14 +300,6 @@ $upgrade_url = admin_url( 'admin.php?page=clientflow-upgrade' );
     color: #fff;
     position: relative;
     overflow: hidden;
-}
-.cf-plan-card::before {
-    content: '';
-    position: absolute;
-    top: -80px; right: -80px;
-    width: 260px; height: 260px;
-    background: radial-gradient(circle, rgba(99,102,241,.3) 0%, transparent 65%);
-    pointer-events: none;
 }
 .cf-plan-name {
     font-family: 'Archivo', -apple-system, sans-serif;
@@ -674,8 +666,8 @@ $upgrade_url = admin_url( 'admin.php?page=clientflow-upgrade' );
     <?php /* ── Top Header ────────────────────────────────────────────────── */ ?>
     <div class="cf-header cf-animate">
         <div class="cf-brand">
-            <div class="cf-brand-name">Plan &amp; Usage</div>
-            <div class="cf-brand-tagline">Your plan, usage limits and feature access</div>
+            <h1 class="cf-brand-name">Plan &amp; Usage</h1>
+            <p class="cf-brand-tagline">Your plan, usage limits and feature access</p>
         </div>
         <div class="cf-header-right">
             <span class="cf-plan-badge <?php echo esc_attr( $user_plan ); ?>">

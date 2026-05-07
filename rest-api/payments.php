@@ -317,7 +317,14 @@ function cf_rest_payment_webhook( WP_REST_Request $request ): WP_REST_Response|W
 	$secret     = ClientFlow_Stripe::get_webhook_secret();
 
 	// ── Signature verification ────────────────────────────────────────────────
-	if ( $secret && ! ClientFlow_Stripe::verify_webhook_signature( $payload, $sig_header, $secret ) ) {
+	if ( ! $secret ) {
+		return new WP_Error(
+			'webhook_not_configured',
+			'Webhook secret is not configured.',
+			[ 'status' => 403 ]
+		);
+	}
+	if ( ! ClientFlow_Stripe::verify_webhook_signature( $payload, $sig_header, $secret ) ) {
 		return new WP_Error(
 			'webhook_signature_invalid',
 			__( 'Webhook signature verification failed.', 'clientflow' ),
@@ -370,6 +377,13 @@ function cf_handle_checkout_complete( array $session ): void {
 		return;
 	}
 
+	// Idempotency guard — if this session was already processed (webhook fired twice
+	// or status endpoint triggered write-through concurrently) skip all side-effects.
+	$existing = ClientFlow_Payment::get_by_session_id( $session_id );
+	if ( ! is_wp_error( $existing ) && 'completed' === $existing['status'] ) {
+		return;
+	}
+
 	// Mark payment complete.
 	ClientFlow_Payment::mark_complete( $session_id, (string) $payment_intent_id, $customer_id ?: null );
 
@@ -377,7 +391,7 @@ function cf_handle_checkout_complete( array $session ): void {
 	global $wpdb;
 	$proposal = $wpdb->get_row(
 		$wpdb->prepare(
-			"SELECT id, owner_id, status, title, client_id FROM {$wpdb->prefix}clientflow_proposals WHERE id = %d",
+			"SELECT id, owner_id, status, title, client_id, total_amount FROM {$wpdb->prefix}clientflow_proposals WHERE id = %d",
 			$proposal_id
 		),
 		ARRAY_A
@@ -402,6 +416,7 @@ function cf_handle_checkout_complete( array $session ): void {
 
 	// Notify modules (e.g. projects) that a proposal has been accepted.
 	do_action( 'cf_proposal_accepted', $proposal_id, (int) $proposal['owner_id'] );
+	do_action( 'cf_payment_completed', (int) $payment['id'], (int) $proposal['owner_id'] );
 
 	// Log event.
 	$wpdb->insert(
@@ -433,6 +448,8 @@ function cf_handle_checkout_complete( array $session ): void {
  * @param array $session  Stripe session object.
  */
 function cf_notify_owner_payment_complete( int $owner_id, array $proposal, array $session ): void {
+	global $wpdb;
+
 	$owner = get_userdata( $owner_id );
 	if ( ! $owner ) {
 		return;
@@ -457,15 +474,22 @@ function cf_notify_owner_payment_complete( int $owner_id, array $proposal, array
 		[ 'Content-Type: text/html; charset=UTF-8' ]
 	);
 
-	// Client receipt email.
+	// Client receipt email — look up the client record directly from clientflow_clients
+	// (client_id is NOT a WordPress user ID; it references our own clients table).
 	if ( ! empty( $proposal['client_id'] ) ) {
-		$client = get_userdata( (int) $proposal['client_id'] );
-		if ( $client ) {
+		$client_row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT name, email FROM {$wpdb->prefix}clientflow_clients WHERE id = %d",
+				(int) $proposal['client_id']
+			),
+			ARRAY_A
+		);
+		if ( $client_row && ! empty( $client_row['email'] ) ) {
 			wp_mail(
-				$client->user_email,
+				$client_row['email'],
 				sprintf( __( 'Payment confirmed — %s', 'clientflow' ), $proposal['title'] ?? 'Proposal' ),
 				cf_email_html( [
-					'name'      => $client->display_name,
+					'name'      => $client_row['name'] ?? '',
 					'body'      => "<p style=\"margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;\">We have received your payment of <strong style=\"color:#1A1A2E;\">{$amount_fmt}</strong> for <em>{$proposal_title}</em>. Thank you!</p><p style=\"margin:0;font-size:16px;color:#6B7280;line-height:1.65;\">You can view your payment history from your client portal.</p>",
 					'cta_label' => __( 'Go to Portal', 'clientflow' ),
 					'cta_url'   => home_url( '/clientflow/payments' ),
@@ -474,4 +498,5 @@ function cf_notify_owner_payment_complete( int $owner_id, array $proposal, array
 			);
 		}
 	}
+
 }

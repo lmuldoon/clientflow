@@ -64,7 +64,11 @@ class ClientFlow_Proposal {
 		if ( ! cf_can_user( $owner_id, 'create_proposal' ) ) {
 			return new WP_Error(
 				'proposal_limit_reached',
-				__( 'You have reached your proposal limit. Upgrade to Pro for unlimited proposals.', 'clientflow' ),
+				sprintf(
+					/* translators: %s: date the monthly limit resets, e.g. "1 June" */
+					__( 'You have reached your 3 proposal limit for this month. Your limit resets on %s. Upgrade to Pro for unlimited proposals.', 'clientflow' ),
+					gmdate( 'j F', strtotime( 'first day of next month' ) )
+				),
 				[ 'status' => 403 ]
 			);
 		}
@@ -266,7 +270,7 @@ class ClientFlow_Proposal {
 			$current_status = $wpdb->get_var(
 				$wpdb->prepare( 'SELECT status FROM ' . self::table() . ' WHERE id = %d AND owner_id = %d', $id, $owner_id )
 			);
-			if ( 'declined' === $current_status ) {
+			if ( in_array( $current_status, [ 'declined', 'revision_requested' ], true ) ) {
 				$update['status'] = 'draft';
 			}
 		}
@@ -370,21 +374,33 @@ class ClientFlow_Proposal {
 			return new WP_Error( 'proposal_not_found', __( 'Proposal not found.', 'clientflow' ), [ 'status' => 404 ] );
 		}
 
-		if ( 'accepted' === $proposal->status ) {
-			$project_exists = (bool) $wpdb->get_var(
-				$wpdb->prepare(
-					"SELECT id FROM {$wpdb->prefix}clientflow_projects WHERE proposal_id = %d LIMIT 1",
-					$id
-				)
-			);
+		// Guard: block deletion when a linked project is still active.
+		$project = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT id, status FROM {$wpdb->prefix}clientflow_projects
+				 WHERE proposal_id = %d AND owner_id = %d AND deleted_at IS NULL
+				 LIMIT 1",
+				$id,
+				$owner_id
+			)
+		);
 
-			if ( $project_exists ) {
+		if ( $project ) {
+			if ( 'completed' !== $project->status ) {
 				return new WP_Error(
-					'proposal_accepted',
-					__( 'This proposal has an active project. Delete the project first if you want to remove it.', 'clientflow' ),
+					'proposal_has_active_project',
+					__( 'This proposal has an active project. Complete or delete the project first.', 'clientflow' ),
 					[ 'status' => 422 ]
 				);
 			}
+			// Project is completed — cascade soft-delete it alongside the proposal.
+			$wpdb->update(
+				$wpdb->prefix . 'clientflow_projects',
+				[ 'deleted_at' => current_time( 'mysql' ) ],
+				[ 'id' => (int) $project->id ],
+				[ '%s' ],
+				[ '%d' ]
+			);
 		}
 
 		// Soft-delete: stamp deleted_at so the row is preserved for analytics and project references.

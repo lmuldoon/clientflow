@@ -582,7 +582,7 @@ function LicenseStep( { data, onChange, plan } ) {
 			<div className="cf-sw-field">
 				<label className="cf-sw-label">
 					License Key
-					<span className="cf-sw-label-hint">from wpclientflow.io</span>
+					<span className="cf-sw-label-hint">from wpclientflow.co.uk</span>
 				</label>
 				<input
 					className="cf-sw-input monospace"
@@ -675,6 +675,32 @@ function BrandStep( { data, onChange } ) {
 					placeholder="Acme Creative Studio"
 					value={ data.business_name || '' }
 					onChange={ e => onChange( 'business_name', e.target.value ) }
+				/>
+			</div>
+			<div className="cf-sw-field">
+				<label className="cf-sw-label">
+					Sender Name
+					<span className="cf-sw-label-hint">shown in client inboxes</span>
+				</label>
+				<input
+					className="cf-sw-input"
+					type="text"
+					placeholder="Acme Creative Studio"
+					value={ data.from_name || '' }
+					onChange={ e => onChange( 'from_name', e.target.value ) }
+				/>
+			</div>
+			<div className="cf-sw-field">
+				<label className="cf-sw-label">
+					Sender Email
+					<span className="cf-sw-label-hint">address you control</span>
+				</label>
+				<input
+					className="cf-sw-input"
+					type="email"
+					placeholder="hello@youragency.com"
+					value={ data.from_email || '' }
+					onChange={ e => onChange( 'from_email', e.target.value ) }
 				/>
 			</div>
 			<div className="cf-sw-field">
@@ -880,7 +906,7 @@ export default function SetupWizard() {
 				<div className="cf-sw-left-footer">
 					<p className="cf-sw-tagline">
 						<strong>Need help?</strong> Visit our{' '}
-						<a href="https://wpclientflow.io/docs" target="_blank" rel="noreferrer"
+						<a href="https://wpclientflow.co.uk/docs" target="_blank" rel="noreferrer"
 							style={ { color: 'rgba(255,255,255,.5)', textDecoration: 'underline' } }>
 							documentation
 						</a>{' '}

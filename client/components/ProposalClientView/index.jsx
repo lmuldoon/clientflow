@@ -398,6 +398,21 @@ export default function ProposalClientView() {
 		}
 	}, [ token ] );
 
+	/* Request a change */
+	const handleRequestChange = useCallback( async ( note = '' ) => {
+		setActionLoading( true );
+		try {
+			const body = JSON.stringify( { note } );
+			const data = await apiFetch( `client/proposals/${ token }/request-change`, { method: 'POST', body } );
+			setProposal( data.proposal );
+			toast( 'Your request has been sent. The sender will be in touch shortly.' );
+		} catch ( err ) {
+			toast( err.message || 'Could not send your request. Please try again.', 'error' );
+		} finally {
+			setActionLoading( false );
+		}
+	}, [ token ] );
+
 	/* ── Render states ────────────────────────────────────────── */
 	if ( loadState === 'loading' ) {
 		return (
@@ -508,6 +523,7 @@ export default function ProposalClientView() {
 					ownerEmail={ proposal.owner_email }
 					onAccept={ handleAccept }
 					onDecline={ handleDecline }
+					onRequestChange={ handleRequestChange }
 					onPayment={ () => setShowPayment( true ) }
 					loading={ actionLoading }
 				/>

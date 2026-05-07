@@ -31,7 +31,7 @@ function injectStyles( id, css ) {
 }
 
 const CSS = `
-.cf-pl-wrap { display: flex; flex-direction: column; padding: 32px 28px 64px; }
+.cf-pl-wrap { display: flex; flex-direction: column; }
 
 .cf-pl-header {
   display: flex; align-items: flex-start; justify-content: space-between;
@@ -39,11 +39,11 @@ const CSS = `
 }
 .cf-pl-title {
   font-family: var(--cf-font);
-  font-size: 26px; font-weight: 800; color: var(--cf-navy);
-  letter-spacing: -.5px; margin: 0 0 4px;
+  font-size: 28px; font-weight: 800; color: var(--cf-navy);
+  letter-spacing: -.5px; margin: 0; line-height: 1;
 }
 .cf-pl-subtitle {
-  font-size: 13.5px; color: var(--cf-slate-500); margin: 0;
+  font-size: 14px; color: var(--cf-slate-400); margin: 6px 0 0; line-height: 1.5;
 }
 
 .cf-pl-tabs {
@@ -146,6 +146,38 @@ const CSS = `
   border-radius: 6px;
 }
 @keyframes cf-pl-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+.cf-pl-upgrade-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  background: var(--cf-amber-bg, #fffbeb);
+  border: 1.5px solid rgba(245,158,11,.25);
+  border-left: 4px solid var(--cf-amber, #f59e0b);
+  border-radius: var(--cf-radius, 12px);
+  padding: 14px 18px;
+  margin-bottom: 24px;
+}
+.cf-pl-upgrade-banner__left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.cf-pl-upgrade-banner__icon {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: rgba(245,158,11,.15);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.cf-pl-upgrade-banner__icon svg { stroke: var(--cf-amber, #f59e0b); }
+.cf-pl-upgrade-banner__text { min-width: 0; }
+.cf-pl-upgrade-banner__title { font-size: 13px; font-weight: 700; color: var(--cf-navy, #1a1a2e); }
+.cf-pl-upgrade-banner__sub { font-size: 12px; color: var(--cf-slate-500, #64748b); margin-top: 2px; line-height: 1.45; }
+.cf-pl-upgrade-banner__btn {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  padding: 7px 14px; border-radius: 7px;
+  background: rgba(245,158,11,.12); border: 1.5px solid rgba(245,158,11,.4);
+  font-size: 12px; font-weight: 600; color: #92400e;
+  text-decoration: none; transition: background .15s, border-color .15s;
+  cursor: pointer;
+}
+.cf-pl-upgrade-banner__btn svg {
+fill: #92400e;
+}
+.cf-pl-upgrade-banner__btn:hover { background: rgba(245,158,11,.2); border-color: rgba(245,158,11,.6); color: #92400e; }
 `;
 
 function StatusBadge( { status } ) {
@@ -180,6 +212,10 @@ function SkeletonCard() {
 
 export default function ProjectList( { onViewProject } ) {
 	injectStyles( 'cf-pl-styles', CSS );
+
+	const isAgency    = window.cfData?.featureAccess?.use_projects === true;
+	const currentPlan = window.cfData?.userPlan ?? 'free';
+	const settingsUrl = ( window.cfData?.adminUrl || '/wp-admin/' ) + 'admin.php?page=clientflow-settings';
 
 	const [ projects, setProjects ] = useState( [] );
 	const [ loading, setLoading ]   = useState( true );
@@ -217,6 +253,30 @@ export default function ProjectList( { onViewProject } ) {
 					</p>
 				</div>
 			</div>
+
+			{ ! isAgency && (
+				<div className="cf-pl-upgrade-banner">
+					<div className="cf-pl-upgrade-banner__left">
+						<div className="cf-pl-upgrade-banner__icon">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+								<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+							</svg>
+						</div>
+						<div className="cf-pl-upgrade-banner__text">
+							<div className="cf-pl-upgrade-banner__title">Projects — Read Only</div>
+							<div className="cf-pl-upgrade-banner__sub">
+								You're on the { currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1) } plan. Your project data is preserved — upgrade to Agency to create and manage projects.
+							</div>
+						</div>
+					</div>
+					<a href={ settingsUrl } className="cf-pl-upgrade-banner__btn">
+						Upgrade to Agency
+						<svg width="12" height="12" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+							<path d="M5 12h14M12 5l7 7-7 7"/>
+						</svg>
+					</a>
+				</div>
+			) }
 
 			{ error && (
 				<div style={ {

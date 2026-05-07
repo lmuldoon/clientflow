@@ -201,7 +201,7 @@ add_action( 'rest_api_init', static function (): void {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function cf_rest_list_projects( WP_REST_Request $request ): WP_REST_Response {
-	$user_id = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$result  = ClientFlow_Project::list( $user_id, [
 		'status'   => $request->get_param( 'status' ),
 		'search'   => $request->get_param( 'search' ),
@@ -216,7 +216,7 @@ function cf_rest_list_projects( WP_REST_Request $request ): WP_REST_Response {
 function cf_rest_get_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	global $wpdb;
 
-	$user_id = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 	$result  = ClientFlow_Project::get( $id, $user_id );
 	if ( is_wp_error( $result ) ) return $result;
@@ -276,8 +276,13 @@ function cf_project_lock_check( int $project_id, int $owner_id ): ?WP_Error {
 function cf_rest_update_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	global $wpdb;
 
-	$user_id = get_current_user_id();
-	$id      = (int) $request->get_param( 'id' );
+	$user_id = cf_get_owner_id( get_current_user_id() );
+
+	if ( ! cf_can_user( $user_id, 'use_projects' ) ) {
+		return new WP_Error( 'projects_not_available', __( 'Projects are available on the Agency plan.', 'clientflow' ), [ 'status' => 403 ] );
+	}
+
+	$id = (int) $request->get_param( 'id' );
 	$data    = array_filter(
 		$request->get_params(),
 		static fn( $k ) => in_array( $k, [ 'name', 'description', 'status' ], true ),
@@ -316,6 +321,7 @@ function cf_rest_update_project( WP_REST_Request $request ): WP_REST_Response|WP
 			);
 		}
 		cf_send_project_completion_email( $project );
+		cf_maybe_send_testimonial_email( $project, $user_id );
 	} elseif ( ! is_wp_error( $project ) && 'completed' === ( $project['status'] ?? '' ) && ! empty( $project['proposal_id'] ) ) {
 		// Project is already complete — sync the proposal status in case it was missed.
 		$wpdb->query(
@@ -333,8 +339,13 @@ function cf_rest_update_project( WP_REST_Request $request ): WP_REST_Response|WP
 }
 
 function cf_rest_delete_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = get_current_user_id();
-	$id      = (int) $request->get_param( 'id' );
+	$user_id = cf_get_owner_id( get_current_user_id() );
+
+	if ( ! cf_can_user( $user_id, 'use_projects' ) ) {
+		return new WP_Error( 'projects_not_available', __( 'Projects are available on the Agency plan.', 'clientflow' ), [ 'status' => 403 ] );
+	}
+
+	$id = (int) $request->get_param( 'id' );
 	$result  = ClientFlow_Project::delete( $id, $user_id );
 	if ( is_wp_error( $result ) ) return $result;
 	return new WP_REST_Response( [ 'deleted' => true, 'id' => $id ], 200 );
@@ -343,7 +354,7 @@ function cf_rest_delete_project( WP_REST_Request $request ): WP_REST_Response|WP
 function cf_rest_get_project_payments( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	global $wpdb;
 
-	$user_id = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 
 	$project = ClientFlow_Project::get( $id, $user_id );
@@ -393,8 +404,12 @@ function cf_rest_get_project_payments( WP_REST_Request $request ): WP_REST_Respo
 }
 
 function cf_rest_create_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id    = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
+
+	if ( ! cf_can_user( $user_id, 'use_projects' ) ) {
+		return new WP_Error( 'projects_not_available', __( 'Projects are available on the Agency plan.', 'clientflow' ), [ 'status' => 403 ] );
+	}
 
 	$lock_error = cf_project_lock_check( $project_id, $user_id );
 	if ( $lock_error ) return $lock_error;
@@ -416,9 +431,13 @@ function cf_rest_create_milestone( WP_REST_Request $request ): WP_REST_Response|
 }
 
 function cf_rest_update_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id    = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 	$mid        = (int) $request->get_param( 'mid' );
+
+	if ( ! cf_can_user( $user_id, 'use_projects' ) ) {
+		return new WP_Error( 'projects_not_available', __( 'Projects are available on the Agency plan.', 'clientflow' ), [ 'status' => 403 ] );
+	}
 	$data       = array_filter(
 		$request->get_params(),
 		static fn( $k ) => in_array( $k, [ 'title', 'description', 'status', 'due_date' ], true ),
@@ -465,19 +484,29 @@ function cf_rest_update_milestone( WP_REST_Request $request ): WP_REST_Response|
 }
 
 function cf_rest_delete_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id    = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 	$mid        = (int) $request->get_param( 'mid' );
-	$result     = ClientFlow_Milestone::delete( $mid, $user_id );
+
+	if ( ! cf_can_user( $user_id, 'use_projects' ) ) {
+		return new WP_Error( 'projects_not_available', __( 'Projects are available on the Agency plan.', 'clientflow' ), [ 'status' => 403 ] );
+	}
+
+	$result = ClientFlow_Milestone::delete( $mid, $user_id );
 	if ( is_wp_error( $result ) ) return $result;
 	$project = ClientFlow_Project::get( $project_id, $user_id );
 	return new WP_REST_Response( [ 'project' => $project ], 200 );
 }
 
 function cf_rest_reorder_milestones( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id    = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
-	$ids        = array_map( 'intval', (array) $request->get_param( 'ordered_ids' ) );
+
+	if ( ! cf_can_user( $user_id, 'use_projects' ) ) {
+		return new WP_Error( 'projects_not_available', __( 'Projects are available on the Agency plan.', 'clientflow' ), [ 'status' => 403 ] );
+	}
+
+	$ids = array_map( 'intval', (array) $request->get_param( 'ordered_ids' ) );
 	$result     = ClientFlow_Milestone::reorder( $project_id, $user_id, $ids );
 	if ( is_wp_error( $result ) ) return $result;
 	$project = ClientFlow_Project::get( $project_id, $user_id );
@@ -485,7 +514,7 @@ function cf_rest_reorder_milestones( WP_REST_Request $request ): WP_REST_Respons
 }
 
 function cf_rest_submit_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id    = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 	$mid        = (int) $request->get_param( 'mid' );
 
@@ -515,13 +544,13 @@ function cf_rest_submit_milestone( WP_REST_Request $request ): WP_REST_Response|
 // ─────────────────────────────────────────────────────────────────────────────
 
 function cf_portal_rest_list_projects( WP_REST_Request $request ): WP_REST_Response {
-	$user_id  = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$projects = ClientFlow_Portal_Data::get_projects( $user_id );
 	return new WP_REST_Response( [ 'projects' => $projects ], 200 );
 }
 
 function cf_portal_rest_get_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 	$project = ClientFlow_Portal_Data::get_project( $user_id, $id );
 	if ( is_wp_error( $project ) ) return $project;
@@ -529,7 +558,7 @@ function cf_portal_rest_get_project( WP_REST_Request $request ): WP_REST_Respons
 }
 
 function cf_portal_rest_approve_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id    = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 	$mid        = (int) $request->get_param( 'mid' );
 
@@ -767,4 +796,65 @@ function cf_send_project_completion_email( array $project ): void {
 	] );
 
 	wp_mail( $client['email'], $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
+}
+
+function cf_maybe_send_testimonial_email( array $project, int $owner_id ): void {
+	if ( '1' !== get_option( 'clientflow_testimonial_enabled' ) ) return;
+
+	$proposal_id = (int) ( $project['proposal_id'] ?? 0 );
+	if ( ! $proposal_id ) return;
+
+	global $wpdb;
+
+	$proposal = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT total_amount, client_id, title FROM {$wpdb->prefix}clientflow_proposals WHERE id = %d AND owner_id = %d",
+			$proposal_id,
+			$owner_id
+		),
+		ARRAY_A
+	);
+
+	if ( ! $proposal || empty( $proposal['total_amount'] ) || empty( $proposal['client_id'] ) ) return;
+
+	$total_paid = (float) $wpdb->get_var(
+		$wpdb->prepare(
+			"SELECT COALESCE(SUM(amount), 0) FROM {$wpdb->prefix}clientflow_payments WHERE proposal_id = %d AND status = 'completed'",
+			$proposal_id
+		)
+	);
+
+	if ( $total_paid < ( (float) $proposal['total_amount'] - 0.01 ) ) return;
+
+	$client_row = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT name, email FROM {$wpdb->prefix}clientflow_clients WHERE id = %d",
+			(int) $proposal['client_id']
+		),
+		ARRAY_A
+	);
+
+	if ( ! $client_row || empty( $client_row['email'] ) ) return;
+
+	$body_text  = get_option( 'clientflow_testimonial_body', '' )
+		?: __( "It was a pleasure working with you. If you have a moment, we\xe2\x80\x99d love to hear your feedback \xe2\x80\x94 it helps us improve and helps others find us.", 'clientflow' );
+	$review_url = get_option( 'clientflow_testimonial_url', '' );
+	$cta_label  = get_option( 'clientflow_testimonial_cta_label', '' ) ?: __( 'Leave a Review', 'clientflow' );
+
+	$email_args = [
+		'name' => $client_row['name'] ?? '',
+		'body' => '<p style="margin:0;font-size:16px;color:#6B7280;line-height:1.65;">'
+		          . nl2br( esc_html( $body_text ) ) . '</p>',
+	];
+	if ( $review_url ) {
+		$email_args['cta_label'] = $cta_label;
+		$email_args['cta_url']   = $review_url;
+	}
+
+	wp_mail(
+		$client_row['email'],
+		sprintf( __( 'How did we do? — %s', 'clientflow' ), $proposal['title'] ?? '' ),
+		cf_email_html( $email_args ),
+		[ 'Content-Type: text/html; charset=UTF-8' ]
+	);
 }

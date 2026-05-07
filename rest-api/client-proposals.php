@@ -73,6 +73,17 @@ add_action( 'rest_api_init', static function (): void {
 			'reason' => [ 'type' => 'string', 'required' => false, 'default' => '',     'sanitize_callback' => 'sanitize_textarea_field' ],
 		],
 	] );
+
+	// ── POST /client/proposals/{token}/request-change ────────────────────────
+	register_rest_route( $ns, "/client/proposals/{$token}/request-change", [
+		'methods'             => WP_REST_Server::CREATABLE,
+		'callback'            => 'cf_rest_client_request_change',
+		'permission_callback' => '__return_true',
+		'args'                => [
+			'token' => [ 'type' => 'string', 'required' => true,  'sanitize_callback' => 'sanitize_text_field' ],
+			'note'  => [ 'type' => 'string', 'required' => false, 'default' => '',     'sanitize_callback' => 'sanitize_textarea_field' ],
+		],
+	] );
 } );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,6 +121,11 @@ function cf_rest_client_get_proposal( WP_REST_Request $request ): WP_REST_Respon
 	}
 	$result['has_paid']          = $has_paid;
 	$result['remaining_balance'] = $remaining_balance;
+
+	// Prevent the payment button appearing when there is nothing to charge.
+	if ( (float) ( $result['total_amount'] ?? 0 ) <= 0 ) {
+		$result['payment_enabled'] = false;
+	}
 
 	return new WP_REST_Response( [ 'proposal' => $result ], 200 );
 }
@@ -155,6 +171,23 @@ function cf_rest_client_decline_proposal( WP_REST_Request $request ): WP_REST_Re
 	$token  = (string) $request->get_param( 'token' );
 	$reason = (string) $request->get_param( 'reason' );
 	$result = ClientFlow_Proposal_Client::decline( $token, $reason );
+
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
+
+	return new WP_REST_Response( [ 'proposal' => $result ], 200 );
+}
+
+/**
+ * POST /clientflow/v1/client/proposals/{token}/request-change
+ *
+ * Client requests changes — moves proposal to revision_requested status.
+ */
+function cf_rest_client_request_change( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$token  = (string) $request->get_param( 'token' );
+	$note   = (string) $request->get_param( 'note' );
+	$result = ClientFlow_Proposal_Client::request_change( $token, $note );
 
 	if ( is_wp_error( $result ) ) {
 		return $result;

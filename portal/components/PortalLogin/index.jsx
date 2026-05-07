@@ -32,7 +32,6 @@ injectStyles( 'cpl-s', `
 /* ── Brand panel ────────────────────────────────────────── */
 .cpl-brand {
 	flex: 0 0 44%;
-	background: linear-gradient(160deg, #312E81 0%, #4F46E5 45%, #6366F1 75%, #8B5CF6 100%);
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -46,9 +45,7 @@ injectStyles( 'cpl-s', `
 	content: '';
 	position: absolute;
 	inset: 0;
-	background:
-		radial-gradient(ellipse 70% 60% at 30% 40%, rgba(255,255,255,.07) 0%, transparent 70%),
-		radial-gradient(ellipse 50% 40% at 80% 70%, rgba(139,92,246,.4) 0%, transparent 60%);
+	background: linear-gradient(to bottom,  rgba(0,0,0,0) 0%,rgba(0,0,0,0.35) 100%);
 	pointer-events: none;
 }
 
@@ -399,7 +396,7 @@ injectStyles( 'cpl-s', `
 		text-align: left;
 	}
 
-	.cpl-logo-wrap { margin: 0; width: 44px; height: 44px; border-radius: 10px; }
+	.cpl-logo-wrap { margin: 0; width: 50px; height: 50px; border-radius: 10px; padding: 5px; }
 	.cpl-logo-initials { font-size: 16px; }
 	.cpl-brand-name { font-size: 16px; margin: 0; }
 	.cpl-brand-tagline { display: none; }
@@ -429,7 +426,8 @@ const EyeIcon = ( { open } ) => open ? (
 );
 
 export default function PortalLogin() {
-	const { businessName, businessLogo } = window.cfPortalData || {};
+	const { businessName, businessLogo, brandColor } = window.cfPortalData || {};
+	const brandBg = brandColor || '#6366F1';
 
 	const initials = ( businessName || 'CF' )
 		.split( ' ' )
@@ -499,7 +497,7 @@ export default function PortalLogin() {
 	}
 
 	const BrandPanel = () => (
-		<div className="cpl-brand">
+		<div className="cpl-brand" style={ { background: brandBg } }>
 			<div className="cpl-brand-deco cpl-brand-deco-1" />
 			<div className="cpl-brand-deco cpl-brand-deco-2" />
 			<div className="cpl-brand-inner">

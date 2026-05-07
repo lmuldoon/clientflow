@@ -40,18 +40,30 @@ injectStyles( 'cps-s', `
 	display: flex;
 	align-items: center;
 	gap: 12px;
+	position: relative;
+	overflow: hidden;
+}
+
+.cps-brand-overlay {
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(135deg, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.04) 100%);
+	pointer-events: none;
 }
 
 .cps-logo-wrap {
 	width: 40px;
 	height: 40px;
 	border-radius: 10px;
-	background: #EEF2FF;
+	background: rgba(255,255,255,0.22);
+	border: 1px solid rgba(255,255,255,0.28);
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	flex-shrink: 0;
 	overflow: hidden;
+	position: relative;
+	z-index: 1;
 }
 
 .cps-logo-wrap img {
@@ -64,18 +76,21 @@ injectStyles( 'cps-s', `
 	font-family: 'Playfair Display', serif;
 	font-size: 15px;
 	font-weight: 700;
-	color: #6366F1;
+	color: #fff;
 }
 
 .cps-biz-name {
 	font-family: 'DM Sans', sans-serif;
 	font-size: 14px;
 	font-weight: 600;
-	color: #1A1A2E;
+	color: #fff;
 	line-height: 1.3;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	position: relative;
+	z-index: 1;
+	text-shadow: 0 1px 3px rgba(0,0,0,0.18);
 }
 
 /* ── Divider ──────────────────────────────────────────── */
@@ -408,7 +423,8 @@ function IconSignOut( { color = '#6B7280' } ) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function PortalSidebar( { page } ) {
-	const { businessName, businessLogo, clientData, pluginUrl } = window.cfPortalData || {};
+	const { businessName, businessLogo, clientData, pluginUrl, brandColor } = window.cfPortalData || {};
+	const brandBg = brandColor || '#6366F1';
 	const [ loggingOut, setLoggingOut ] = useState( false );
 
 	const initials = ( businessName || 'CF' )
@@ -443,7 +459,8 @@ export default function PortalSidebar( { page } ) {
 		<aside className="cps-sidebar">
 
 			{ /* ── Branding ── */ }
-			<div className="cps-brand">
+			<div className="cps-brand" style={ { background: brandBg } }>
+				<div className="cps-brand-overlay" />
 				<div className="cps-logo-wrap">
 					{ businessLogo
 						? <img src={ businessLogo } alt={ businessName } />
@@ -508,7 +525,7 @@ export default function PortalSidebar( { page } ) {
 			<div className="cps-footer">
 				{ cfLogoUrl && (
 					<a
-						href="https://wpclientflow.io"
+						href="https://wpclientflow.co.uk"
 						className="cps-cf-branding"
 						target="_blank"
 						rel="noopener noreferrer"

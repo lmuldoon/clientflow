@@ -252,6 +252,7 @@ function cf_rest_get_usage( WP_REST_Request $request ): WP_REST_Response {
 				'team_seats'  => ClientFlow_Entitlements::get_team_limit( $user_id ),
 				'storage_mb'  => 1000,
 			],
+			'next_reset' => gmdate( 'Y-m-d', strtotime( 'first day of next month midnight' ) ),
 		],
 		200
 	);

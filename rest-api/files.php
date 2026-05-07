@@ -105,7 +105,7 @@ add_action( 'rest_api_init', static function (): void {
 // ── Admin handlers ────────────────────────────────────────────────────────────
 
 function cf_rest_list_files( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$owner_id   = get_current_user_id();
+	$owner_id   = cf_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 	$files      = ClientFlow_File::list( $project_id, $owner_id );
 
@@ -113,7 +113,7 @@ function cf_rest_list_files( WP_REST_Request $request ): WP_REST_Response|WP_Err
 }
 
 function cf_rest_upload_file( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$owner_id   = get_current_user_id();
+	$owner_id   = cf_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 
 	if ( empty( $_FILES['file'] ) ) {
@@ -132,14 +132,14 @@ function cf_rest_upload_file( WP_REST_Request $request ): WP_REST_Response|WP_Er
 }
 
 function cf_rest_download_file( WP_REST_Request $request ): void {
-	$owner_id = get_current_user_id();
+	$owner_id = cf_get_owner_id( get_current_user_id() );
 	$file_id  = (int) $request->get_param( 'fid' );
 
 	ClientFlow_File::stream( $file_id, $owner_id, false );
 }
 
 function cf_rest_delete_file( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$owner_id = get_current_user_id();
+	$owner_id = cf_get_owner_id( get_current_user_id() );
 	$file_id  = (int) $request->get_param( 'fid' );
 	$result   = ClientFlow_File::delete( $file_id, $owner_id );
 

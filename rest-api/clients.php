@@ -37,32 +37,28 @@ add_action( 'rest_api_init', static function (): void {
 function cf_rest_list_clients( WP_REST_Request $request ): WP_REST_Response {
 	global $wpdb;
 
-	$user_id = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$ct      = $wpdb->prefix . 'clientflow_clients';
 	$pt      = $wpdb->prefix . 'clientflow_proposals';
 
+	// Single JOIN against the latest accepted/completed proposal per client,
+	// replacing three correlated subqueries that generated N×3 extra queries.
 	$rows = $wpdb->get_results(
 		$wpdb->prepare(
 			"SELECT c.*,
-			        ( SELECT p.title
-			          FROM   {$pt} p
-			          WHERE  p.client_id = c.id AND p.status IN ('accepted','completed')
-			          ORDER  BY p.accepted_at DESC
-			          LIMIT  1
-			        ) AS latest_proposal_title,
-			        ( SELECT p.status
-			          FROM   {$pt} p
-			          WHERE  p.client_id = c.id AND p.status IN ('accepted','completed')
-			          ORDER  BY p.accepted_at DESC
-			          LIMIT  1
-			        ) AS latest_proposal_status,
-			        ( SELECT CASE WHEN p.status = 'completed' THEN p.updated_at ELSE p.accepted_at END
-			          FROM   {$pt} p
-			          WHERE  p.client_id = c.id AND p.status IN ('accepted','completed')
-			          ORDER  BY p.accepted_at DESC
-			          LIMIT  1
-			        ) AS latest_proposal_date
+			        lp.title  AS latest_proposal_title,
+			        lp.status AS latest_proposal_status,
+			        CASE WHEN lp.status = 'completed' THEN lp.updated_at ELSE lp.accepted_at END AS latest_proposal_date
 			 FROM   {$ct} c
+			 LEFT JOIN {$pt} lp ON lp.id = (
+			     SELECT p2.id
+			     FROM   {$pt} p2
+			     WHERE  p2.client_id = c.id
+			       AND  p2.status IN ('accepted','completed')
+			       AND  p2.deleted_at IS NULL
+			     ORDER  BY p2.accepted_at DESC
+			     LIMIT  1
+			 )
 			 WHERE  c.owner_id = %d
 			 ORDER  BY c.created_at DESC",
 			$user_id
@@ -83,8 +79,12 @@ function cf_rest_list_clients( WP_REST_Request $request ): WP_REST_Response {
 function cf_rest_invite_client( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	global $wpdb;
 
-	$user_id   = get_current_user_id();
+	$user_id = cf_get_owner_id( get_current_user_id() );
 	$client_id = (int) $request->get_param( 'id' );
+
+	if ( ! cf_rest_rate_limit( 'invite_client', $user_id, 20 ) ) {
+		return new WP_Error( 'rate_limited', __( 'Too many requests. Please wait a moment.', 'clientflow' ), [ 'status' => 429 ] );
+	}
 
 	// Gate: owner must have portal access.
 	if ( ! cf_can_user( $user_id, 'use_portal' ) ) {

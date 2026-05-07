@@ -194,11 +194,14 @@ class ClientFlow_Proposal_Handlers {
 	 *
 	 * @param int    $proposal_id
 	 * @param int    $owner_id
-	 * @param string $client_email Override email (falls back to stored client email).
+	 * @param string $client_email  Override email (falls back to stored client email).
+	 * @param string $email_subject Custom subject line (falls back to auto-generated).
 	 *
 	 * @return true|WP_Error
 	 */
-	public static function send_to_client( int $proposal_id, int $owner_id, string $client_email = '' ): true|WP_Error {
+	public static function send_to_client( int $proposal_id, int $owner_id, string $client_email = '', string $email_subject = '' ): true|WP_Error {
+		global $wpdb;
+
 		$result = ClientFlow_Proposal::send( $proposal_id, $owner_id, $client_email );
 
 		if ( is_wp_error( $result ) ) {
@@ -214,8 +217,25 @@ class ClientFlow_Proposal_Handlers {
 
 		$recipient = $client_email ?: ( $proposal['client_email'] ?? '' );
 
+		// If the proposal has no client linked but we have an email address,
+		// resolve or create the client record and link it now. Without this,
+		// project auto-creation silently fails on acceptance because it requires
+		// a client_id on the proposal row.
+		if ( empty( $proposal['client_id'] ) && $recipient ) {
+			$client_id = self::resolve_client( $owner_id, '', $recipient, '', '' );
+			if ( $client_id && ! is_wp_error( $client_id ) ) {
+				$wpdb->update(
+					$wpdb->prefix . 'clientflow_proposals',
+					[ 'client_id' => $client_id ],
+					[ 'id' => $proposal_id ],
+					[ '%d' ],
+					[ '%d' ]
+				);
+			}
+		}
+
 		if ( $recipient ) {
-			self::send_proposal_email( $proposal, $recipient );
+			self::send_proposal_email( $proposal, $recipient, $email_subject );
 		}
 
 		return true;
@@ -439,15 +459,23 @@ class ClientFlow_Proposal_Handlers {
 	 *
 	 * @return void
 	 */
-	private static function send_proposal_email( array $proposal, string $recipient ): void {
+	private static function send_proposal_email( array $proposal, string $recipient, string $email_subject = '' ): void {
 		$owner        = get_user_by( 'ID', $proposal['owner_id'] );
-		$from         = $owner ? $owner->display_name : get_bloginfo( 'name' );
+		$site_name    = get_bloginfo( 'name' ) ?: 'ClientFlow';
+		$from_display = ( $owner && $owner->display_name ) ? $owner->display_name : $site_name;
 		$proposal_url = esc_url( get_site_url() . '/proposals/' . ( $proposal['token'] ?? $proposal['id'] ) );
-		$title        = esc_html( $proposal['title'] );
-		$from_esc     = esc_html( $from );
+		$title        = esc_html( $proposal['title'] ?? '' );
+		$from_esc     = esc_html( $from_display );
 		$expiry       = esc_html( $proposal['expiry_date'] ?? __( 'the specified date', 'clientflow' ) );
 
-		$subject   = sprintf( __( 'You have received a proposal: %s', 'clientflow' ), $proposal['title'] );
+		if ( ! empty( trim( $email_subject ) ) ) {
+			$subject = sanitize_text_field( $email_subject );
+		} elseif ( ! empty( trim( $proposal['title'] ?? '' ) ) ) {
+			$subject = sprintf( __( 'Proposal Received: %s', 'clientflow' ), $proposal['title'] );
+		} else {
+			$subject = sprintf( __( 'Proposal Received from %s', 'clientflow' ), $from_display );
+		}
+
 		$body_html = "
 			<p style=\"margin:0;font-size:16px;color:#6B7280;line-height:1.65;\">
 				<strong style=\"color:#1A1A2E;\">{$from_esc}</strong> has sent you a new proposal.
@@ -461,21 +489,32 @@ class ClientFlow_Proposal_Handlers {
 			</p>";
 
 		$message = cf_email_html( [
+			'subject'   => $subject,
 			'name'      => $proposal['client_name'] ?? '',
 			'body'      => $body_html,
 			'cta_label' => __( 'View Proposal', 'clientflow' ),
 			'cta_url'   => $proposal_url,
 		] );
 
+		// WordPress uses PHP's mail() function by default, which has a 63-char line
+		// length limit for headers. PHPMailer Q-encodes subjects longer than ~47 chars
+		// and folds them with \n — PHP's mail() then mangles the folded encoded-words,
+		// causing the subject to arrive blank. Setting UseSMTPUTF8 makes encodeHeader()
+		// return the raw string instead of applying RFC 2047 encoding/wrapping.
+		$fix_subject_encoding = static function ( $mailer ) use ( &$fix_subject_encoding ): void {
+			remove_action( 'phpmailer_init', $fix_subject_encoding, 999 );
+			$mailer->UseSMTPUTF8 = true; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		};
+		add_action( 'phpmailer_init', $fix_subject_encoding, 999 );
+
 		wp_mail(
 			$recipient,
 			$subject,
 			$message,
-			[
-				"From: {$from} <" . get_option( 'admin_email' ) . '>',
-				'Content-Type: text/html; charset=UTF-8',
-			]
+			[ 'Content-Type: text/html; charset=UTF-8' ]
 		);
+
+		remove_action( 'phpmailer_init', $fix_subject_encoding, 999 );
 	}
 }
 

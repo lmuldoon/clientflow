@@ -21,6 +21,8 @@ module.exports = {
 		analytics: './admin/analytics.jsx',
 		setup:     './admin/setup.jsx',
 		clients:   './admin/clients.jsx',
+		team:      './admin/team.jsx',
+		webhooks:  './admin/webhooks.jsx',
 		client:    './client/index.jsx',
 		portal:    './portal/index.jsx',
 	},

@@ -253,8 +253,23 @@ function cf_validate_portal_password( string $password ): array {
  * POST /portal/set-password
  */
 function cf_portal_set_password( WP_REST_Request $request ): WP_REST_Response {
+	$user_id  = get_current_user_id();
 	$password = $request->get_param( 'password' );
-	$errors   = cf_validate_portal_password( $password );
+
+	// If the client has already set a password, require verification of the current one.
+	if ( ClientFlow_Portal_Auth::has_set_password( $user_id ) ) {
+		$current = (string) $request->get_param( 'current_password' );
+		$user    = get_user_by( 'ID', $user_id );
+		if ( ! $user || ! wp_check_password( $current, $user->user_pass, $user_id ) ) {
+			return new WP_REST_Response( [
+				'success' => false,
+				'message' => __( 'Current password is incorrect.', 'clientflow' ),
+				'errors'  => [ 'current_password' ],
+			], 401 );
+		}
+	}
+
+	$errors = cf_validate_portal_password( $password );
 
 	if ( $errors ) {
 		return new WP_REST_Response( [
@@ -264,7 +279,6 @@ function cf_portal_set_password( WP_REST_Request $request ): WP_REST_Response {
 		], 422 );
 	}
 
-	$user_id = get_current_user_id();
 	wp_set_password( $password, $user_id );
 	ClientFlow_Portal_Auth::mark_password_set( $user_id );
 	// wp_set_password() destroys all sessions — re-issue the auth cookie.

@@ -61,7 +61,7 @@ class ClientFlow_Entitlements {
 		return [
 			// ── Proposals ────────────────────────────────────────────────────
 			'create_proposal' => [
-				'free'   => [ 'limit' => 5,    'limit_type' => 'total' ],
+				'free'   => [ 'limit' => 3,    'limit_type' => 'monthly' ],
 				'pro'    => [ 'limit' => null,  'limit_type' => null ],
 				'agency' => [ 'limit' => null,  'limit_type' => null ],
 			],
@@ -75,6 +75,13 @@ class ClientFlow_Entitlements {
 
 			// ── Payments ──────────────────────────────────────────────────────
 			'use_payments' => [
+				'free'   => false,
+				'pro'    => true,
+				'agency' => true,
+			],
+
+			// ── Outbound Webhooks ─────────────────────────────────────────────
+			'use_webhooks' => [
 				'free'   => false,
 				'pro'    => true,
 				'agency' => true,
@@ -291,6 +298,19 @@ class ClientFlow_Entitlements {
 				$wpdb->prepare(
 					"SELECT COUNT(*) FROM {$wpdb->prefix}clientflow_ai_usage_logs
 					 WHERE user_id = %d AND month = %s",
+					$user_id,
+					gmdate( 'Y-m' )
+				)
+			);
+		}
+
+		// Count directly from the proposals table — always accurate, no cron dependency.
+		if ( 'create_proposal' === $feature ) {
+			return (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$wpdb->prefix}clientflow_proposals
+					 WHERE owner_id = %d AND deleted_at IS NULL
+					 AND DATE_FORMAT(created_at, '%%Y-%%m') = %s",
 					$user_id,
 					gmdate( 'Y-m' )
 				)
