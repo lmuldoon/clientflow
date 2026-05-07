@@ -308,8 +308,8 @@ function cf_rest_update_proposal( WP_REST_Request $request ): WP_REST_Response|W
 			'completed'          => [],
 		];
 
-		$blocked = $allowed_from[ $current_status ] ?? [];
-		if ( in_array( $data['status'], $blocked, true ) || ( $current_status !== $data['status'] && in_array( $current_status, [ 'declined', 'expired', 'completed' ], true ) ) ) {
+		$allowed = $allowed_from[ $current_status ] ?? [];
+		if ( $current_status !== $data['status'] && ! in_array( $data['status'], $allowed, true ) ) {
 			return new WP_Error(
 				'invalid_status_transition',
 				sprintf(

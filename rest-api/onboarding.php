@@ -29,7 +29,6 @@ add_action( 'rest_api_init', static function (): void {
 		'permission_callback' => 'cf_rest_require_auth',
 		'args'                => [
 			'step'                   => [ 'type' => 'integer', 'minimum' => 0, 'maximum' => 4 ],
-			'license_key'            => [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
 			'stripe_pk'              => [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
 			'stripe_sk'              => [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
 			'stripe_webhook_secret'  => [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
@@ -58,7 +57,6 @@ function cf_onboarding_status( WP_REST_Request $request ): WP_REST_Response {
 		'complete'      => (bool) get_option( 'clientflow_onboarding_complete' ),
 		'step'          => (int) get_option( 'clientflow_onboarding_step', 0 ),
 		'saved'         => [
-			'license_key'   => ( $lk = get_option( 'clientflow_license_key', '' ) ) ? '****' . substr( $lk, -4 ) : '',
 			'stripe_pk'     => get_option( 'clientflow_stripe_publishable_key', '' ),
 			'business_name' => get_option( 'clientflow_business_name', '' ),
 			'from_name'     => get_option( 'clientflow_from_name', '' ),
@@ -74,7 +72,6 @@ function cf_onboarding_status( WP_REST_Request $request ): WP_REST_Response {
  */
 function cf_onboarding_save( WP_REST_Request $request ): WP_REST_Response {
 	$map = [
-		'license_key'           => 'clientflow_license_key',
 		'stripe_pk'             => 'clientflow_stripe_publishable_key',
 		'stripe_sk'             => 'clientflow_stripe_secret_key',
 		'stripe_webhook_secret' => 'clientflow_stripe_webhook_secret',

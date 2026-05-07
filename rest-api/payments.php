@@ -386,6 +386,7 @@ function cf_handle_checkout_complete( array $session ): void {
 
 	// Mark payment complete.
 	ClientFlow_Payment::mark_complete( $session_id, (string) $payment_intent_id, $customer_id ?: null );
+	$payment = ClientFlow_Payment::get_by_session_id( $session_id );
 
 	// Ensure proposal is accepted.
 	global $wpdb;
@@ -401,7 +402,9 @@ function cf_handle_checkout_complete( array $session ): void {
 		return;
 	}
 
-	// Transition to 'accepted' if still in an open state.
+	// Transition to 'accepted' if still in an open state, and notify modules once.
+	// Firing cf_proposal_accepted on every payment would re-send the portal magic-link
+	// email on every milestone/installment — it must only fire on first acceptance.
 	if ( in_array( $proposal['status'], [ 'draft', 'sent', 'viewed' ], true ) ) {
 		$wpdb->update(
 			$wpdb->prefix . 'clientflow_proposals',
@@ -412,11 +415,23 @@ function cf_handle_checkout_complete( array $session ): void {
 			],
 			[ 'id' => $proposal_id ]
 		);
+		do_action( 'cf_proposal_accepted', $proposal_id, (int) $proposal['owner_id'] );
 	}
+	do_action( 'cf_payment_completed', ! is_wp_error( $payment ) ? (int) $payment['id'] : 0, (int) $proposal['owner_id'] );
 
-	// Notify modules (e.g. projects) that a proposal has been accepted.
-	do_action( 'cf_proposal_accepted', $proposal_id, (int) $proposal['owner_id'] );
-	do_action( 'cf_payment_completed', (int) $payment['id'], (int) $proposal['owner_id'] );
+	// If the linked project was already marked complete before this payment arrived,
+	// the testimonial check at project-completion time would have found no completed
+	// payment and silently skipped. Retry it now.
+	$completed_project = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT * FROM {$wpdb->prefix}clientflow_projects WHERE proposal_id = %d AND status = 'completed' LIMIT 1",
+			$proposal_id
+		),
+		ARRAY_A
+	);
+	if ( $completed_project && function_exists( 'cf_maybe_send_testimonial_email' ) ) {
+		cf_maybe_send_testimonial_email( $completed_project, (int) $proposal['owner_id'] );
+	}
 
 	// Log event.
 	$wpdb->insert(

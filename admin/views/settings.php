@@ -25,7 +25,6 @@ $errors = [];
 if ( 'POST' === $_SERVER['REQUEST_METHOD'] && ! empty( $_POST['cf_settings_nonce'] ) ) {
 	if ( wp_verify_nonce( $_POST['cf_settings_nonce'], 'cf_save_settings' ) ) {
 		$fields = [
-			'clientflow_license_key'            => 'sanitize_text_field',
 			'clientflow_stripe_publishable_key' => 'sanitize_text_field',
 			'clientflow_stripe_secret_key'      => 'sanitize_text_field',
 			'clientflow_stripe_webhook_secret'  => 'sanitize_text_field',
@@ -46,13 +45,6 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && ! empty( $_POST['cf_settings_nonce
 		// Checkbox: unchecked boxes don't appear in POST, so handle explicitly.
 		update_option( 'clientflow_testimonial_enabled', ! empty( $_POST['clientflow_testimonial_enabled'] ) ? '1' : '' );
 
-		// Plan override (dev/testing only).
-		if ( ! empty( $_POST['cf_dev_plan'] ) ) {
-			$new_plan = sanitize_text_field( wp_unslash( $_POST['cf_dev_plan'] ) );
-			$old_plan = ClientFlow_Entitlements::get_user_plan( get_current_user_id() );
-			ClientFlow_Entitlements::set_user_plan( get_current_user_id(), $new_plan, $old_plan );
-		}
-
 		$saved = true;
 	} else {
 		$errors[] = __( 'Security check failed. Please try again.', 'clientflow' );
@@ -61,8 +53,6 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && ! empty( $_POST['cf_settings_nonce
 
 // ── Current values ────────────────────────────────────────────────────────────
 
-$current_plan = ClientFlow_Entitlements::get_user_plan( get_current_user_id() );
-$license_key  = get_option( 'clientflow_license_key', '' );
 $pub_key      = get_option( 'clientflow_stripe_publishable_key', '' );
 $secret_key   = get_option( 'clientflow_stripe_secret_key', '' );
 $webhook_sec  = get_option( 'clientflow_stripe_webhook_secret', '' );
@@ -81,8 +71,6 @@ $testimonial_body      = get_option( 'clientflow_testimonial_body', '' );
 $testimonial_review_url = get_option( 'clientflow_testimonial_url', '' );
 $testimonial_cta_label = get_option( 'clientflow_testimonial_cta_label', '' );
 
-$plan_colors = [ 'free' => 'cf-badge--none', 'pro' => 'cf-badge--test', 'agency' => 'cf-badge--live' ];
-$plan_color  = $plan_colors[ $current_plan ] ?? 'cf-badge--none';
 ?>
 <div>
 <style>
@@ -384,55 +372,6 @@ $plan_color  = $plan_colors[ $current_plan ] ?? 'cf-badge--none';
 		<?php wp_nonce_field( 'cf_save_settings', 'cf_settings_nonce' ); ?>
 
 		<div class="cf-settings-grid">
-
-			<!-- ── Licence card ─────────────────────────────────────────────────── -->
-			<div class="cf-card cf-card--full">
-				<p class="cf-card__title">
-					<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
-					</svg>
-					<?php esc_html_e( 'Licence', 'clientflow' ); ?>
-					<?php if ( $license_key ) : ?>
-						<span class="cf-badge <?php echo esc_attr( $plan_color ); ?>">
-							<?php echo esc_html( ucfirst( $current_plan ) ); ?>
-						</span>
-					<?php else : ?>
-						<span class="cf-badge cf-badge--none"><?php esc_html_e( 'Not configured', 'clientflow' ); ?></span>
-					<?php endif; ?>
-				</p>
-				<p class="cf-card__desc">
-					<?php esc_html_e( 'Your ClientFlow licence key unlocks Pro or Agency features and authenticates AI requests on your behalf. Enter the key from your purchase confirmation email.', 'clientflow' ); ?>
-				</p>
-
-				<div class="cf-field">
-					<label class="cf-label" for="cf-license-key">
-						<?php esc_html_e( 'Licence Key', 'clientflow' ); ?>
-					</label>
-					<input
-						type="password"
-						id="cf-license-key"
-						name="clientflow_license_key"
-						class="cf-input"
-						value="<?php echo esc_attr( $license_key ); ?>"
-						placeholder="sk_…"
-						autocomplete="new-password"
-						spellcheck="false"
-					>
-					<p class="cf-help">
-						<?php esc_html_e( 'Find your licence key in your Freemius account under Licences, or in your purchase confirmation email.', 'clientflow' ); ?>
-					</p>
-				</div>
-
-				<div class="cf-test-row">
-					<button
-						type="button"
-						id="cf-license-test-btn"
-						class="cf-copy-btn"
-						onclick="cfTestLicence()"
-					><?php esc_html_e( 'Test Licence', 'clientflow' ); ?></button>
-					<span id="cf-license-test-result" class="cf-test-result"></span>
-				</div>
-			</div>
 
 			<!-- ── Stripe API Keys card ──────────────────────────────────────────── -->
 			<div class="cf-card">
@@ -739,35 +678,6 @@ $plan_color  = $plan_colors[ $current_plan ] ?? 'cf-badge--none';
 				</div>
 			</div>
 
-			<!-- ── Developer plan override ───────────────────────────────────────── -->
-			<div class="cf-card cf-card--full" style="border:1.5px dashed #D1D5DB;background:#FAFAF8;">
-				<p class="cf-card__title" style="color:#6B7280;">
-					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
-						<path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
-					</svg>
-					<?php esc_html_e( 'Developer: Plan Override', 'clientflow' ); ?>
-					<span class="cf-badge cf-badge--none" style="font-size:10px;margin-left:4px;">TESTING ONLY</span>
-				</p>
-				<p class="cf-card__desc">
-					<?php esc_html_e( 'Override your plan to test gated features (payments, portal, AI). This only affects your own account. Set back to Free when done.', 'clientflow' ); ?>
-				</p>
-				<div class="cf-field" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-					<label class="cf-label" for="cf-dev-plan" style="margin:0;white-space:nowrap;">
-						<?php esc_html_e( 'Your current plan:', 'clientflow' ); ?>
-					</label>
-					<select id="cf-dev-plan" name="cf_dev_plan" class="cf-plan-select">
-						<?php foreach ( [ 'free' => 'Free', 'pro' => 'Pro', 'agency' => 'Agency' ] as $slug => $label ) : ?>
-							<option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $current_plan, $slug ); ?>>
-								<?php echo esc_html( $label ); ?>
-							</option>
-						<?php endforeach; ?>
-					</select>
-					<span class="cf-badge <?php echo esc_attr( $plan_color ); ?>">
-						<?php echo esc_html( ucfirst( $current_plan ) ); ?> <?php esc_html_e( 'active', 'clientflow' ); ?>
-					</span>
-				</div>
-			</div>
-
 		</div><!-- /.cf-settings-grid -->
 
 		<button type="submit" class="cf-btn-save">
@@ -812,38 +722,4 @@ $plan_color  = $plan_colors[ $current_plan ] ?? 'cf-badge--none';
 	}
 }());
 
-function cfTestLicence() {
-	var btn    = document.getElementById( 'cf-license-test-btn' );
-	var result = document.getElementById( 'cf-license-test-result' );
-	btn.disabled    = true;
-	btn.textContent = 'Testing…';
-	result.textContent = '';
-	result.style.color = '';
-
-	fetch( '<?php echo esc_js( rest_url( 'clientflow/v1/ai/test-connection' ) ); ?>', {
-		method:  'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			'X-WP-Nonce':   '<?php echo esc_js( wp_create_nonce( 'wp_rest' ) ); ?>',
-		},
-	} )
-	.then( function( r ) { return r.json(); } )
-	.then( function( data ) {
-		btn.disabled    = false;
-		btn.textContent = 'Test Licence';
-		if ( data.success ) {
-			result.textContent = '✓ ' + data.message;
-			result.style.color = '#065F46';
-		} else {
-			result.textContent = '✗ ' + data.message;
-			result.style.color = '#991B1B';
-		}
-	} )
-	.catch( function() {
-		btn.disabled    = false;
-		btn.textContent = 'Test Licence';
-		result.textContent = '✗ Request failed. Check browser console.';
-		result.style.color = '#991B1B';
-	} );
-}
 </script>

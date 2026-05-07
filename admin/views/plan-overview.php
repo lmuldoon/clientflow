@@ -126,8 +126,8 @@ $features = [
 	],
 ];
 
-// Upgrade CTA target.
-$upgrade_url = admin_url( 'admin.php?page=clientflow-upgrade' );
+// Upgrade CTA target — use Freemius pricing page.
+$upgrade_url = function_exists( 'clientflow_fs' ) ? clientflow_fs()->get_upgrade_url() : 'https://clientflow.io/pricing';
 ?>
 
 <style>
@@ -254,6 +254,7 @@ $upgrade_url = admin_url( 'admin.php?page=clientflow-upgrade' );
 }
 .cf-btn-upgrade:hover {
     background: #4F46E5;
+    color: #fff !important;
     transform: translateY(-1px);
     box-shadow: 0 4px 16px rgba(99,102,241,.5);
 }
@@ -346,6 +347,7 @@ $upgrade_url = admin_url( 'admin.php?page=clientflow-upgrade' );
 }
 .cf-btn-upgrade-card:hover {
     background: #4F46E5;
+    color: #fff !important;
     transform: translateY(-1px);
     box-shadow: 0 4px 20px rgba(99,102,241,.6);
 }

@@ -105,7 +105,7 @@ injectStyles( 'cppr-s', `
 .cppr-card-body.open { display: block; }
 
 /* ── Milestones panel ────────────────────────────────── */
-.cppr-milestones { padding: 0 26px 20px; }
+.cppr-milestones { padding: 20px 26px 20px; }
 
 .cppr-ms-list { display: flex; flex-direction: column; gap: 0; margin-top: 16px; }
 

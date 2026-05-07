@@ -22,6 +22,100 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( function_exists( 'clientflow_fs' ) ) {
+	clientflow_fs()->set_basename( true, __FILE__ );
+} else {
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Freemius SDK Bootstrap
+// ─────────────────────────────────────────────────────────────────────────────
+
+if ( ! function_exists( 'clientflow_fs' ) ) {
+	// Create a helper function for easy SDK access.
+	function clientflow_fs() {
+		global $clientflow_fs;
+
+		if ( ! isset( $clientflow_fs ) ) {
+			// Include Freemius SDK.
+			require_once dirname( __FILE__ ) . '/vendor/freemius/start.php';
+
+			$clientflow_fs = fs_dynamic_init( array(
+				'id'                  => '29266',
+				'slug'                => 'clientflow',
+				'type'                => 'plugin',
+				'public_key'          => 'pk_7340e277f5277dff75373f4c2f12b',
+				'is_premium'          => true,
+				// If your plugin is a serviceware, set this option to false.
+				'has_premium_version' => true,
+				'has_addons'          => false,
+				'has_paid_plans'      => true,
+				'is_org_compliant'    => true,
+				// Automatically removed in the free version. If you're not using the
+				// auto-generated free version, delete this line before uploading to wp.org.
+				'wp_org_gatekeeper'   => 'OA7#BoRiBNqdf52FvzEf!!074aRLPs8fspif$7K1#4u4Csys1fQlCecVcUTOs2mcpeVHi#C2j9d09fOTvbC0HloPT7fFee5WdS3G',
+				'menu'                => array(
+					'slug'       => 'clientflow-settings',
+					'first-path' => 'admin.php?page=clientflow-setup',
+					'support'    => false,
+					'parent'     => array(
+						'slug' => 'clientflow',
+					),
+				),
+			) );
+		}
+
+		return $clientflow_fs;
+	}
+
+	// Init Freemius.
+	clientflow_fs();
+	// Signal that SDK was initiated.
+	do_action( 'clientflow_fs_loaded' );
+
+	// ── Freemius licence key sync ────────────────────────────────────────────
+	clientflow_fs()->add_action( 'after_license_activation', static function (): void {
+		$license = clientflow_fs()->_get_license();
+		if ( $license && ! empty( $license->secret_key ) ) {
+			update_option( 'clientflow_license_key', $license->secret_key );
+		}
+		$plan = strtolower( (string) clientflow_fs()->get_plan_name() );
+		if ( in_array( $plan, [ 'pro', 'agency' ], true ) ) {
+			ClientFlow_Entitlements::set_user_plan( get_current_user_id(), $plan );
+		}
+	} );
+
+	clientflow_fs()->add_action( 'after_license_deactivation', static function (): void {
+		update_option( 'clientflow_license_key', '' );
+		ClientFlow_Entitlements::set_user_plan( get_current_user_id(), 'free' );
+	} );
+
+	clientflow_fs()->add_action( 'after_license_change', static function ( $_plan_change, $plan ): void {
+		$plan_name = strtolower( is_object( $plan ) ? (string) $plan->name : '' );
+		if ( in_array( $plan_name, [ 'pro', 'agency' ], true ) ) {
+			ClientFlow_Entitlements::set_user_plan( get_current_user_id(), $plan_name );
+		}
+	}, 10, 2 );
+
+	// Backfill: sync key and plan on first admin load after deployment,
+	// for licenses that were active before these hooks existed.
+	add_action( 'admin_init', static function (): void {
+		$license = clientflow_fs()->_get_license();
+		if ( ! $license || empty( $license->secret_key ) ) {
+			return;
+		}
+		if ( ! get_option( 'clientflow_license_key', '' ) ) {
+			update_option( 'clientflow_license_key', $license->secret_key );
+		}
+		$owner_id = cf_get_owner_id( get_current_user_id() );
+		if ( 'free' === ClientFlow_Entitlements::get_user_plan( $owner_id ) ) {
+			$plan_name = strtolower( (string) clientflow_fs()->get_plan_name() );
+			if ( in_array( $plan_name, [ 'pro', 'agency' ], true ) ) {
+				ClientFlow_Entitlements::set_user_plan( $owner_id, $plan_name );
+			}
+		}
+	} );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,7 +127,7 @@ define( 'CLIENTFLOW_URL',        plugin_dir_url( __FILE__ ) );
 define( 'CLIENTFLOW_BASENAME',   plugin_basename( __FILE__ ) );
 
 // AI relay server URL — update this if you move hosting. Never exposed to agencies.
-define( 'CLIENTFLOW_AI_RELAY_URL', 'https://clientflow.io' );
+define( 'CLIENTFLOW_AI_RELAY_URL', 'https://clientflow.wpclientflow.co.uk' );
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Autoloader
@@ -1180,3 +1274,5 @@ register_deactivation_hook( __FILE__, 'clientflow_deactivate' );
 add_action( 'plugins_loaded', static function (): void {
 	ClientFlow::instance();
 } );
+
+} // end Freemius free/paid guard
