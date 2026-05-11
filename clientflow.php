@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: ClientFlow
+ * Plugin Name: Clientflow
  * Plugin URI:  https://wpclientflow.co.uk
  * Description: Professional proposal, payment, and client management for freelancers and agencies.
- * Version:     0.1.0
+ * Version:     0.1.2
  * Author:      Codievolt
  * Author URI:  https://codievolt.com
  * License:     GPL-2.0-or-later
@@ -903,16 +903,6 @@ final class ClientFlow {
 			[ $this, 'render_analytics' ]
 		);
 
-		// Settings: owner-only — team members do not manage plugin settings.
-		add_submenu_page(
-			'clientflow',
-			__( 'Settings', 'clientflow' ),
-			__( 'Settings', 'clientflow' ),
-			'manage_options',
-			'clientflow-settings',
-			[ $this, 'render_settings' ]
-		);
-
 		add_submenu_page(
 			'clientflow',
 			__( 'Team', 'clientflow' ),
@@ -929,6 +919,16 @@ final class ClientFlow {
 			'manage_clientflow',
 			'clientflow-webhooks',
 			[ $this, 'render_webhooks' ]
+		);
+
+		// Settings: owner-only — team members do not manage plugin settings.
+		add_submenu_page(
+			'clientflow',
+			__( 'Settings', 'clientflow' ),
+			__( 'Settings', 'clientflow' ),
+			'manage_options',
+			'clientflow-settings',
+			[ $this, 'render_settings' ]
 		);
 
 		// Setup wizard — hidden from sidebar (null parent), accessible via redirect on activation.

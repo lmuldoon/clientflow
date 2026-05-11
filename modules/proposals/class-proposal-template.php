@@ -62,7 +62,7 @@ class ClientFlow_Proposal_Template {
 					[
 						'type'    => 'list',
 						'items'   => [
-							'Discovery & strategy session',
+							'Discovery and strategy session',
 							'Wireframes and UX design',
 							'Visual design (up to 5 pages)',
 							'Responsive development',

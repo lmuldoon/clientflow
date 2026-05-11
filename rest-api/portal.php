@@ -351,8 +351,9 @@ function cf_portal_get_receipt( WP_REST_Request $request ): WP_REST_Response {
 			 FROM   {$pm} AS pay
 			 JOIN   {$pt} AS pr ON pr.id  = pay.proposal_id
 			 JOIN   {$ct} AS c  ON c.id   = pr.client_id
+			 JOIN   {$wpdb->users} u ON u.user_email = c.email
 			 WHERE  pay.id = %d
-			   AND  c.wp_user_id = %d
+			   AND  u.ID = %d
 			   AND  pay.status = 'completed'",
 			$payment_id,
 			$user->ID

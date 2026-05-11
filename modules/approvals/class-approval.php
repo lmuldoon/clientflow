@@ -312,6 +312,8 @@ class ClientFlow_Approval {
 
 	/**
 	 * Check whether a WP user is the client assigned to a project.
+	 * Matches by email (consistent with ClientFlow_Portal_Data) so the check
+	 * works even before clientflow_clients.wp_user_id has been back-filled.
 	 */
 	private static function client_owns_project( int $project_id, int $client_wp_user_id ): bool {
 		global $wpdb;
@@ -320,7 +322,8 @@ class ClientFlow_Approval {
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM {$wpdb->prefix}clientflow_projects p
 				 INNER JOIN {$wpdb->prefix}clientflow_clients c ON p.client_id = c.id
-				 WHERE p.id = %d AND c.wp_user_id = %d",
+				 INNER JOIN {$wpdb->users} u ON u.user_email = c.email
+				 WHERE p.id = %d AND u.ID = %d",
 				$project_id,
 				$client_wp_user_id
 			)
@@ -389,7 +392,13 @@ class ClientFlow_Approval {
 			ARRAY_A
 		);
 
-		if ( ! $row || ! $row['client_email'] ) {
+		if ( ! $row ) {
+			error_log( '[ClientFlow] notify_client: no DB row found for approval #' . $approval_id );
+			return;
+		}
+
+		if ( ! $row['client_email'] ) {
+			error_log( '[ClientFlow] notify_client: client has no email address (approval #' . $approval_id . ', project: ' . ( $row['project_name'] ?? 'unknown' ) . ')' );
 			return;
 		}
 
@@ -417,6 +426,10 @@ class ClientFlow_Approval {
 			'cta_url'   => home_url( '/clientflow/' ),
 		] );
 
-		wp_mail( $row['client_email'], $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
+		$sent = wp_mail( $row['client_email'], $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
+
+		if ( ! $sent ) {
+			error_log( '[ClientFlow] notify_client: wp_mail() returned false for approval #' . $approval_id . ' → ' . $row['client_email'] );
+		}
 	}
 }

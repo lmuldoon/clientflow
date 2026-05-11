@@ -423,7 +423,7 @@ function IconSignOut( { color = '#6B7280' } ) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function PortalSidebar( { page } ) {
-	const { businessName, businessLogo, clientData, pluginUrl, brandColor } = window.cfPortalData || {};
+	const { businessName, businessLogo, clientData, pluginUrl, brandColor, hasProjects } = window.cfPortalData || {};
 	const brandBg = brandColor || '#6366F1';
 	const [ loggingOut, setLoggingOut ] = useState( false );
 
@@ -441,7 +441,7 @@ export default function PortalSidebar( { page } ) {
 	const nav = [
 		{ slug: 'dashboard', label: 'Dashboard', Icon: IconDashboard },
 		{ slug: 'proposals', label: 'Proposals', Icon: IconProposals },
-		{ slug: 'projects',  label: 'Projects',  Icon: IconProjects  },
+		...( hasProjects ? [ { slug: 'projects', label: 'Projects', Icon: IconProjects } ] : [] ),
 		{ slug: 'payments',  label: 'Payments',  Icon: IconPayments  },
 	];
 

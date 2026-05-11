@@ -387,7 +387,8 @@ class ClientFlow_File {
 
 	/**
 	 * Check whether a WP user is the client assigned to a project.
-	 * Uses the portal auth link: clientflow_clients.wp_user_id.
+	 * Matches by email (consistent with ClientFlow_Portal_Data) so the check
+	 * works even before clientflow_clients.wp_user_id has been back-filled.
 	 */
 	private static function client_owns_project( int $project_id, int $client_wp_user_id ): bool {
 		global $wpdb;
@@ -396,7 +397,8 @@ class ClientFlow_File {
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM {$wpdb->prefix}clientflow_projects p
 				 INNER JOIN {$wpdb->prefix}clientflow_clients c ON p.client_id = c.id
-				 WHERE p.id = %d AND c.wp_user_id = %d",
+				 INNER JOIN {$wpdb->users} u ON u.user_email = c.email
+				 WHERE p.id = %d AND u.ID = %d",
 				$project_id,
 				$client_wp_user_id
 			)

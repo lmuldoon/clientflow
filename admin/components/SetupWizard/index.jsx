@@ -436,7 +436,7 @@ body.cf-setup-active {
 }
 .cf-sw-btn-primary {
   background: #6366f1;
-  color: #fff;
+  color: #fff !important;
 }
 .cf-sw-btn-primary:hover:not(:disabled) {
   background: #5557e8;
@@ -490,7 +490,6 @@ function injectStyles( id, css ) {
 
 const STEPS = [
 	{ label: 'Welcome',   sub: 'Get started'          },
-	{ label: 'Your Plan', sub: 'License & tier'        },
 	{ label: 'Payments',  sub: 'Stripe integration'    },
 	{ label: 'Brand',     sub: 'Your identity'         },
 	{ label: 'Done',      sub: 'All set!'              },
@@ -568,46 +567,12 @@ function WelcomeStep() {
 	);
 }
 
-function LicenseStep( { data, onChange, plan } ) {
-	const planLabels = { free: 'Free', pro: 'Pro', agency: 'Agency' };
-	const planLabel  = planLabels[ plan ] || plan;
-
-	return (
-		<div>
-			<p className="cf-sw-step-num">Step 2 of 5</p>
-			<h1 className="cf-sw-heading">Activate Your Plan</h1>
-			<p className="cf-sw-sub">
-				Enter your license key to unlock Pro or Agency features, or continue free to explore the basics.
-			</p>
-			<div className="cf-sw-field">
-				<label className="cf-sw-label">
-					License Key
-					<span className="cf-sw-label-hint">from wpclientflow.co.uk</span>
-				</label>
-				<input
-					className="cf-sw-input monospace"
-					type="text"
-					placeholder="CF-XXXX-XXXX-XXXX-XXXX"
-					value={ data.license_key || '' }
-					onChange={ e => onChange( 'license_key', e.target.value ) }
-				/>
-			</div>
-			{ plan && (
-				<div className={ `cf-sw-plan-badge ${ plan }` }>
-					<CheckIcon size={ 13 } />
-					{ planLabel } Plan Active
-				</div>
-			) }
-		</div>
-	);
-}
-
 function StripeStep( { data, onChange, plan } ) {
 	const isFree = plan === 'free' || ! plan;
 
 	return (
 		<div>
-			<p className="cf-sw-step-num">Step 3 of 5</p>
+			<p className="cf-sw-step-num">Step 2 of 4</p>
 			<h1 className="cf-sw-heading">Connect Stripe</h1>
 			<p className="cf-sw-sub">
 				Accept payments directly within proposals. You can always add this later in Settings.
@@ -662,7 +627,7 @@ function BrandStep( { data, onChange } ) {
 
 	return (
 		<div>
-			<p className="cf-sw-step-num">Step 4 of 5</p>
+			<p className="cf-sw-step-num">Step 3 of 4</p>
 			<h1 className="cf-sw-heading">Your Brand</h1>
 			<p className="cf-sw-sub">
 				Your branding appears on proposals, emails, and the client portal.
@@ -786,9 +751,8 @@ export default function SetupWizard() {
 	const [ direction, setDirection ] = useState( 'forward' );
 	const [ saving,    setSaving    ] = useState( false );
 	const [ error,     setError     ] = useState( null );
-	const [ plan,      setPlan      ] = useState( window.cfData?.userPlan || '' );
+	const [ plan ] = useState( window.cfData?.userPlan || '' );
 	const [ data,      setData      ] = useState( {
-		license_key:           '',
 		stripe_pk:             '',
 		stripe_sk:             '',
 		stripe_webhook_secret: '',
@@ -806,7 +770,7 @@ export default function SetupWizard() {
 				setData( prev => ( { ...prev, ...status.saved } ) );
 			}
 			if ( status.step > 0 ) {
-				setStep( Math.min( status.step, 4 ) );
+				setStep( Math.min( status.step, 3 ) );
 			}
 		} ).catch( () => {} );
 
@@ -822,24 +786,17 @@ export default function SetupWizard() {
 		setSaving( true );
 		try {
 			// Save current step's data.
-			if ( step > 0 && step < 4 ) {
+			if ( step > 0 && step < 3 ) {
 				await apiFetch( 'onboarding/save', {
 					method: 'POST',
 					body:   JSON.stringify( { step, ...data } ),
 				} );
 			}
-			// Step 1: verify license to determine plan.
-			if ( step === 1 && data.license_key ) {
-				try {
-					const status = await apiFetch( 'entitlements/status' );
-					if ( status.plan ) setPlan( status.plan );
-				} catch { /* non-critical */ }
-			}
-			// Step 4: mark complete before rendering done.
-			if ( step === 3 ) {
+			// Step 2 (Brand): save then mark complete before rendering done.
+			if ( step === 2 ) {
 				await apiFetch( 'onboarding/save', {
 					method: 'POST',
-					body:   JSON.stringify( { step: 3, ...data } ),
+					body:   JSON.stringify( { step: 2, ...data } ),
 				} );
 				await apiFetch( 'onboarding/complete', { method: 'POST', body: '{}' } );
 			}
@@ -866,7 +823,7 @@ export default function SetupWizard() {
 	};
 
 	const primaryLabel = step === 0 ? 'Get Started →'
-		: step === 3 ? ( saving ? 'Saving…' : 'Finish Setup →' )
+		: step === 2 ? ( saving ? 'Saving…' : 'Finish Setup →' )
 		: ( saving ? 'Saving…' : 'Save & Continue →' );
 
 	return (
@@ -920,15 +877,14 @@ export default function SetupWizard() {
 				<div className="cf-sw-content">
 					<div key={ step } className={ animClass }>
 						{ step === 0 && <WelcomeStep /> }
-						{ step === 1 && <LicenseStep data={ data } onChange={ handleChange } plan={ plan } /> }
-						{ step === 2 && <StripeStep  data={ data } onChange={ handleChange } plan={ plan } /> }
-						{ step === 3 && <BrandStep   data={ data } onChange={ handleChange } /> }
-						{ step === 4 && <DoneStep /> }
+						{ step === 1 && <StripeStep  data={ data } onChange={ handleChange } plan={ plan } /> }
+						{ step === 2 && <BrandStep   data={ data } onChange={ handleChange } /> }
+						{ step === 3 && <DoneStep /> }
 					</div>
 					{ error && <div className="cf-sw-error">{ error }</div> }
 				</div>
 
-				{ step < 4 && (
+				{ step < 3 && (
 					<div className="cf-sw-nav">
 						<div className="cf-sw-nav-left">
 							{ step > 0 && (
@@ -936,7 +892,7 @@ export default function SetupWizard() {
 									← Back
 								</button>
 							) }
-							{ step === 2 && (
+							{ step === 1 && (
 								<button className="cf-sw-skip" onClick={ goNext } disabled={ saving }>
 									Skip for now
 								</button>

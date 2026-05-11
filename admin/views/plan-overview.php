@@ -310,6 +310,7 @@ $upgrade_url = function_exists( 'clientflow_fs' ) ? clientflow_fs()->get_upgrade
     margin-bottom: 4px;
     position: relative;
     z-index: 1;
+    font-weight: 800;
 }
 .cf-plan-sub {
     font-size: 13px;

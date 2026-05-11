@@ -241,8 +241,9 @@ class ClientFlow_Message {
 				"UPDATE " . self::table() . " m
 				 INNER JOIN {$wpdb->prefix}clientflow_projects p ON m.project_id = p.id
 				 INNER JOIN {$wpdb->prefix}clientflow_clients c ON p.client_id = c.id
+				 INNER JOIN {$wpdb->users} u ON u.user_email = c.email
 				 SET m.read_at = %s
-				 WHERE m.project_id = %d AND c.wp_user_id = %d
+				 WHERE m.project_id = %d AND u.ID = %d
 				   AND m.sender_type = 'admin' AND m.read_at IS NULL",
 				current_time( 'mysql' ),
 				$project_id,
@@ -361,6 +362,8 @@ class ClientFlow_Message {
 
 	/**
 	 * Check whether a WP user is the client assigned to a project.
+	 * Matches by email (consistent with ClientFlow_Portal_Data) so the check
+	 * works even before clientflow_clients.wp_user_id has been back-filled.
 	 *
 	 * @param int $project_id
 	 * @param int $client_wp_user_id
@@ -374,7 +377,8 @@ class ClientFlow_Message {
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM {$wpdb->prefix}clientflow_projects p
 				 INNER JOIN {$wpdb->prefix}clientflow_clients c ON p.client_id = c.id
-				 WHERE p.id = %d AND c.wp_user_id = %d",
+				 INNER JOIN {$wpdb->users} u ON u.user_email = c.email
+				 WHERE p.id = %d AND u.ID = %d",
 				$project_id,
 				$client_wp_user_id
 			)

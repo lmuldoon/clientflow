@@ -34,6 +34,26 @@ if ( 'verify' === $cf_portal_page ) {
 	$cf_verify_token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
 }
 
+// Determine if the admin owner has the agency plan (projects are agency-only).
+$cf_has_projects = false;
+if ( ClientFlow_Portal_Auth::is_authenticated() ) {
+	global $wpdb;
+	$owner_id = (int) $wpdb->get_var(
+		$wpdb->prepare(
+			"SELECT p.owner_id
+			 FROM {$wpdb->prefix}clientflow_proposals p
+			 INNER JOIN {$wpdb->prefix}clientflow_clients c ON c.id = p.client_id
+			 INNER JOIN {$wpdb->users} u ON u.user_email = c.email
+			 WHERE u.ID = %d
+			 LIMIT 1",
+			get_current_user_id()
+		)
+	);
+	if ( $owner_id ) {
+		$cf_has_projects = (bool) ClientFlow_Entitlements::can_user( $owner_id, 'use_projects' );
+	}
+}
+
 // Nonce for WP REST API calls.
 $cf_nonce = wp_create_nonce( 'wp_rest' );
 
@@ -89,6 +109,7 @@ window.cfPortalData = <?php echo wp_json_encode( [
 	'brandColor'      => $cf_brand_color,
 	'verifyToken'     => $cf_verify_token,
 	'pluginUrl'       => CLIENTFLOW_URL,
+	'hasProjects'     => $cf_has_projects,
 ] ); ?>;
 </script>
 
