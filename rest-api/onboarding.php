@@ -10,6 +10,11 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 add_action( 'rest_api_init', static function (): void {
 
@@ -18,15 +23,15 @@ add_action( 'rest_api_init', static function (): void {
 	// GET /onboarding/status
 	register_rest_route( $ns, '/onboarding/status', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_onboarding_status',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_onboarding_status',
+		'permission_callback' => 'clientflow_rest_require_auth',
 	] );
 
 	// POST /onboarding/save
 	register_rest_route( $ns, '/onboarding/save', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_onboarding_save',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_onboarding_save',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'step'                   => [ 'type' => 'integer', 'minimum' => 0, 'maximum' => 4 ],
 			'stripe_pk'              => [ 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
@@ -43,8 +48,8 @@ add_action( 'rest_api_init', static function (): void {
 	// POST /onboarding/complete
 	register_rest_route( $ns, '/onboarding/complete', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_onboarding_complete',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_onboarding_complete',
+		'permission_callback' => 'clientflow_rest_require_auth',
 	] );
 
 } );
@@ -52,7 +57,7 @@ add_action( 'rest_api_init', static function (): void {
 /**
  * Return current onboarding state.
  */
-function cf_onboarding_status( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_onboarding_status( WP_REST_Request $request ): WP_REST_Response {
 	return new WP_REST_Response( [
 		'complete'      => (bool) get_option( 'clientflow_onboarding_complete' ),
 		'step'          => (int) get_option( 'clientflow_onboarding_step', 0 ),
@@ -70,7 +75,7 @@ function cf_onboarding_status( WP_REST_Request $request ): WP_REST_Response {
 /**
  * Save one step's worth of settings and advance the stored step pointer.
  */
-function cf_onboarding_save( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_onboarding_save( WP_REST_Request $request ): WP_REST_Response {
 	$map = [
 		'stripe_pk'             => 'clientflow_stripe_publishable_key',
 		'stripe_sk'             => 'clientflow_stripe_secret_key',
@@ -106,7 +111,7 @@ function cf_onboarding_save( WP_REST_Request $request ): WP_REST_Response {
 /**
  * Mark onboarding as complete.
  */
-function cf_onboarding_complete( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_onboarding_complete( WP_REST_Request $request ): WP_REST_Response {
 	update_option( 'clientflow_onboarding_complete', gmdate( 'c' ) );
 
 	return new WP_REST_Response( [ 'success' => true ], 200 );

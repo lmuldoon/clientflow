@@ -19,6 +19,7 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -46,16 +47,16 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Admin: list ──────────────────────────────────────────────────────────
 	register_rest_route( $ns, "/projects/{$proj_id}/messages", [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_list_messages',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_list_messages',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 
 	// ── Admin: send ──────────────────────────────────────────────────────────
 	register_rest_route( $ns, "/projects/{$proj_id}/messages", [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_send_message',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_send_message',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id'      => [ 'type' => 'integer', 'required' => true ],
 			'message' => [ 'type' => 'string',  'required' => true, 'sanitize_callback' => 'sanitize_textarea_field' ],
@@ -65,8 +66,8 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Admin: delete ────────────────────────────────────────────────────────
 	register_rest_route( $ns, "/projects/{$proj_id}/messages/{$msg_id}", [
 		'methods'             => WP_REST_Server::DELETABLE,
-		'callback'            => 'cf_rest_delete_message',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_delete_message',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id'  => [ 'type' => 'integer', 'required' => true ],
 			'mid' => [ 'type' => 'integer', 'required' => true ],
@@ -76,14 +77,14 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Admin: global unread count ───────────────────────────────────────────
 	register_rest_route( $ns, '/messages/unread-count', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_messages_unread_count',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_messages_unread_count',
+		'permission_callback' => 'clientflow_rest_require_auth',
 	] );
 
 	// ── Portal: list ─────────────────────────────────────────────────────────
 	register_rest_route( $ns, "/portal/projects/{$proj_id}/messages", [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_portal_rest_list_messages',
+		'callback'            => 'clientflow_portal_rest_list_messages',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
@@ -91,7 +92,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Portal: send ─────────────────────────────────────────────────────────
 	register_rest_route( $ns, "/portal/projects/{$proj_id}/messages", [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_portal_rest_send_message',
+		'callback'            => 'clientflow_portal_rest_send_message',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 		'args'                => [
 			'id'      => [ 'type' => 'integer', 'required' => true ],
@@ -102,7 +103,7 @@ add_action( 'rest_api_init', static function (): void {
 
 // ── Admin handlers ────────────────────────────────────────────────────────────
 
-function cf_rest_list_messages( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_rest_list_messages( WP_REST_Request $request ): WP_REST_Response {
 	$owner_id   = get_current_user_id();
 	$project_id = (int) $request->get_param( 'id' );
 	$result     = ClientFlow_Message::list_for_admin( $project_id, $owner_id );
@@ -110,7 +111,7 @@ function cf_rest_list_messages( WP_REST_Request $request ): WP_REST_Response {
 	return new WP_REST_Response( $result, 200 );
 }
 
-function cf_rest_send_message( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_send_message( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$owner_id   = get_current_user_id();
 	$project_id = (int) $request->get_param( 'id' );
 	$text       = (string) $request->get_param( 'message' );
@@ -127,7 +128,7 @@ function cf_rest_send_message( WP_REST_Request $request ): WP_REST_Response|WP_E
 	return new WP_REST_Response( $result, 201 );
 }
 
-function cf_rest_delete_message( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_delete_message( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$owner_id   = get_current_user_id();
 	$message_id = (int) $request->get_param( 'mid' );
 	$result     = ClientFlow_Message::delete( $message_id, $owner_id );
@@ -139,7 +140,7 @@ function cf_rest_delete_message( WP_REST_Request $request ): WP_REST_Response|WP
 	return new WP_REST_Response( [ 'deleted' => true ], 200 );
 }
 
-function cf_rest_messages_unread_count( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_rest_messages_unread_count( WP_REST_Request $request ): WP_REST_Response {
 	$owner_id = get_current_user_id();
 	$count    = ClientFlow_Message::unread_count_admin( $owner_id );
 
@@ -148,7 +149,7 @@ function cf_rest_messages_unread_count( WP_REST_Request $request ): WP_REST_Resp
 
 // ── Portal handlers ───────────────────────────────────────────────────────────
 
-function cf_portal_rest_list_messages( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_portal_rest_list_messages( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$client_id  = get_current_user_id();
 	$project_id = (int) $request->get_param( 'id' );
 	$result     = ClientFlow_Message::list_for_client( $project_id, $client_id );
@@ -160,7 +161,7 @@ function cf_portal_rest_list_messages( WP_REST_Request $request ): WP_REST_Respo
 	return new WP_REST_Response( $result, 200 );
 }
 
-function cf_portal_rest_send_message( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_portal_rest_send_message( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$client_id  = get_current_user_id();
 	$project_id = (int) $request->get_param( 'id' );
 	$text       = (string) $request->get_param( 'message' );

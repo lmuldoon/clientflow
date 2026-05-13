@@ -26,12 +26,16 @@ rsync -a \
   --exclude='webpack.config.js' \
   --exclude='phpunit.xml.dist' \
   --exclude='bin' \
+  --exclude='languages/.gitkeep' \
+  --exclude='.DS_Store' \
+  --exclude='assets/screenshot-*' \
+  --exclude='assets/banner-*' \
+  --exclude='assets/icon-*' \
   --exclude='*.map' \
   --exclude='admin/*.jsx' \
   --exclude='admin/components' \
   --exclude='admin/pages' \
   --exclude='admin/styles' \
-  --exclude='admin/views' \
   --exclude='client/index.jsx' \
   --exclude='portal/index.jsx' \
   --exclude='portal/portal-globals.js' \

@@ -19,6 +19,7 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -47,24 +48,24 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Admin: list ──────────────────────────────────────────────────────────
 	register_rest_route( $ns, "/projects/{$proj_id}/files", [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_list_files',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_list_files',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 
 	// ── Admin: upload ────────────────────────────────────────────────────────
 	register_rest_route( $ns, "/projects/{$proj_id}/files", [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_upload_file',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_upload_file',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 
 	// ── Admin: download ──────────────────────────────────────────────────────
 	register_rest_route( $ns, "/projects/{$proj_id}/files/{$file_id}/download", [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_download_file',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_download_file',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id'  => [ 'type' => 'integer', 'required' => true ],
 			'fid' => [ 'type' => 'integer', 'required' => true ],
@@ -74,8 +75,8 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Admin: delete ────────────────────────────────────────────────────────
 	register_rest_route( $ns, "/projects/{$proj_id}/files/{$file_id}", [
 		'methods'             => WP_REST_Server::DELETABLE,
-		'callback'            => 'cf_rest_delete_file',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_delete_file',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id'  => [ 'type' => 'integer', 'required' => true ],
 			'fid' => [ 'type' => 'integer', 'required' => true ],
@@ -85,7 +86,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Portal: list ─────────────────────────────────────────────────────────
 	register_rest_route( $ns, "/portal/projects/{$proj_id}/files", [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_portal_rest_list_files',
+		'callback'            => 'clientflow_portal_rest_list_files',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
@@ -93,7 +94,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Portal: download ─────────────────────────────────────────────────────
 	register_rest_route( $ns, "/portal/projects/{$proj_id}/files/{$file_id}/download", [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_portal_rest_download_file',
+		'callback'            => 'clientflow_portal_rest_download_file',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 		'args'                => [
 			'id'  => [ 'type' => 'integer', 'required' => true ],
@@ -104,23 +105,25 @@ add_action( 'rest_api_init', static function (): void {
 
 // ── Admin handlers ────────────────────────────────────────────────────────────
 
-function cf_rest_list_files( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$owner_id   = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_list_files( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$owner_id   = clientflow_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 	$files      = ClientFlow_File::list( $project_id, $owner_id );
 
 	return new WP_REST_Response( [ 'files' => $files ], 200 );
 }
 
-function cf_rest_upload_file( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$owner_id   = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_upload_file( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$owner_id   = clientflow_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 
+	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- REST endpoint; authentication handled by permission_callback.
 	if ( empty( $_FILES['file'] ) ) {
 		return new WP_Error( 'no_file', __( 'No file provided.', 'clientflow' ), [ 'status' => 400 ] );
 	}
 
-	$result = ClientFlow_File::upload( $project_id, $owner_id, $_FILES['file'] );
+	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- REST endpoint; authentication handled by permission_callback.
+	$result = ClientFlow_File::upload( $project_id, $owner_id, $_FILES['file'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.NonceVerification.Missing -- $_FILES passed to wp_handle_upload(); REST auth handled by permission_callback.
 
 	if ( is_wp_error( $result ) ) {
 		return $result;
@@ -131,15 +134,15 @@ function cf_rest_upload_file( WP_REST_Request $request ): WP_REST_Response|WP_Er
 	return new WP_REST_Response( [ 'files' => $files ], 201 );
 }
 
-function cf_rest_download_file( WP_REST_Request $request ): void {
-	$owner_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_download_file( WP_REST_Request $request ): void {
+	$owner_id = clientflow_get_owner_id( get_current_user_id() );
 	$file_id  = (int) $request->get_param( 'fid' );
 
 	ClientFlow_File::stream( $file_id, $owner_id, false );
 }
 
-function cf_rest_delete_file( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$owner_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_delete_file( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$owner_id = clientflow_get_owner_id( get_current_user_id() );
 	$file_id  = (int) $request->get_param( 'fid' );
 	$result   = ClientFlow_File::delete( $file_id, $owner_id );
 
@@ -152,7 +155,7 @@ function cf_rest_delete_file( WP_REST_Request $request ): WP_REST_Response|WP_Er
 
 // ── Portal handlers ───────────────────────────────────────────────────────────
 
-function cf_portal_rest_list_files( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_portal_rest_list_files( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$client_id  = get_current_user_id();
 	$project_id = (int) $request->get_param( 'id' );
 	$result     = ClientFlow_File::get_for_client( $project_id, $client_id );
@@ -164,7 +167,7 @@ function cf_portal_rest_list_files( WP_REST_Request $request ): WP_REST_Response
 	return new WP_REST_Response( [ 'files' => $result ], 200 );
 }
 
-function cf_portal_rest_download_file( WP_REST_Request $request ): void {
+function clientflow_portal_rest_download_file( WP_REST_Request $request ): void {
 	$client_id  = get_current_user_id();
 	$project_id = (int) $request->get_param( 'id' );
 	$file_id    = (int) $request->get_param( 'fid' );

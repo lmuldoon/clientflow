@@ -18,6 +18,7 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -37,7 +38,7 @@ add_action( 'rest_api_init', static function (): void {
 	// generic /{token} route so WordPress matches the more specific path first.
 	register_rest_route( $ns, "/client/proposals/preview/{$token}", [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_client_get_preview_proposal',
+		'callback'            => 'clientflow_rest_client_get_preview_proposal',
 		'permission_callback' => '__return_true',
 		'args'                => [
 			'token' => [ 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ],
@@ -47,7 +48,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── GET /client/proposals/{token} ────────────────────────────────────────
 	register_rest_route( $ns, "/client/proposals/{$token}", [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_client_get_proposal',
+		'callback'            => 'clientflow_rest_client_get_proposal',
 		'permission_callback' => '__return_true', // Token is the credential.
 		'args'                => [
 			'token' => [ 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ],
@@ -57,7 +58,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── POST /client/proposals/{token}/view ──────────────────────────────────
 	register_rest_route( $ns, "/client/proposals/{$token}/view", [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_client_track_view',
+		'callback'            => 'clientflow_rest_client_track_view',
 		'permission_callback' => '__return_true',
 		'args'                => [
 			'token' => [ 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ],
@@ -67,7 +68,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── POST /client/proposals/{token}/accept ────────────────────────────────
 	register_rest_route( $ns, "/client/proposals/{$token}/accept", [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_client_accept_proposal',
+		'callback'            => 'clientflow_rest_client_accept_proposal',
 		'permission_callback' => '__return_true',
 		'args'                => [
 			'token' => [ 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ],
@@ -77,7 +78,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── POST /client/proposals/{token}/decline ───────────────────────────────
 	register_rest_route( $ns, "/client/proposals/{$token}/decline", [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_client_decline_proposal',
+		'callback'            => 'clientflow_rest_client_decline_proposal',
 		'permission_callback' => '__return_true',
 		'args'                => [
 			'token'  => [ 'type' => 'string', 'required' => true,  'sanitize_callback' => 'sanitize_text_field' ],
@@ -88,7 +89,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── POST /client/proposals/{token}/request-change ────────────────────────
 	register_rest_route( $ns, "/client/proposals/{$token}/request-change", [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_client_request_change',
+		'callback'            => 'clientflow_rest_client_request_change',
 		'permission_callback' => '__return_true',
 		'args'                => [
 			'token' => [ 'type' => 'string', 'required' => true,  'sanitize_callback' => 'sanitize_text_field' ],
@@ -107,7 +108,7 @@ add_action( 'rest_api_init', static function (): void {
  * Returns proposal data by preview token — same shape as the client endpoint
  * but adds is_preview:true and never tracks views or allows actions.
  */
-function cf_rest_client_get_preview_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_client_get_preview_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$preview_token = (string) $request->get_param( 'token' );
 
 	if ( ! class_exists( 'ClientFlow_Proposal' ) ) {
@@ -147,7 +148,7 @@ function cf_rest_client_get_preview_proposal( WP_REST_Request $request ): WP_RES
  *
  * Returns the client-safe proposal data (no owner_id, no token field).
  */
-function cf_rest_client_get_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_client_get_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$token  = (string) $request->get_param( 'token' );
 	$result = ClientFlow_Proposal_Client::get_by_token( $token );
 
@@ -188,10 +189,10 @@ function cf_rest_client_get_proposal( WP_REST_Request $request ): WP_REST_Respon
  * Logs a view event and transitions sent → viewed on first open.
  * Returns 200 always (best-effort tracking — clients should not see errors here).
  */
-function cf_rest_client_track_view( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_rest_client_track_view( WP_REST_Request $request ): WP_REST_Response {
 	$token      = (string) $request->get_param( 'token' );
-	$ip         = sanitize_text_field( $_SERVER['REMOTE_ADDR']     ?? '' );
-	$user_agent = sanitize_text_field( $_SERVER['HTTP_USER_AGENT'] ?? '' );
+	$ip         = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR']     ?? '' ) );
+	$user_agent = sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ?? '' ) );
 
 	ClientFlow_Proposal_Client::track_view( $token, $ip, $user_agent );
 
@@ -203,7 +204,7 @@ function cf_rest_client_track_view( WP_REST_Request $request ): WP_REST_Response
  *
  * Client accepts the proposal.
  */
-function cf_rest_client_accept_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_client_accept_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$token  = (string) $request->get_param( 'token' );
 	$result = ClientFlow_Proposal_Client::accept( $token );
 
@@ -219,7 +220,7 @@ function cf_rest_client_accept_proposal( WP_REST_Request $request ): WP_REST_Res
  *
  * Client declines the proposal.
  */
-function cf_rest_client_decline_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_client_decline_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$token  = (string) $request->get_param( 'token' );
 	$reason = (string) $request->get_param( 'reason' );
 	$result = ClientFlow_Proposal_Client::decline( $token, $reason );
@@ -236,7 +237,7 @@ function cf_rest_client_decline_proposal( WP_REST_Request $request ): WP_REST_Re
  *
  * Client requests changes — moves proposal to revision_requested status.
  */
-function cf_rest_client_request_change( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_client_request_change( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$token  = (string) $request->get_param( 'token' );
 	$note   = (string) $request->get_param( 'note' );
 	$result = ClientFlow_Proposal_Client::request_change( $token, $note );

@@ -7,5 +7,9 @@
  *
  * @package ClientFlow
  */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 ?>
 <div id="cf-setup-root" class="cf-setup-page"></div>

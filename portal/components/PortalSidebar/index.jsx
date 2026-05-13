@@ -42,6 +42,7 @@ injectStyles( 'cps-s', `
 	gap: 12px;
 	position: relative;
 	overflow: hidden;
+	flex-direction:column;
 }
 
 .cps-brand-overlay {
@@ -373,6 +374,18 @@ injectStyles( 'cps-s', `
 }
 ` );
 
+// ── Contrast helper ───────────────────────────────────────────────────────────
+
+function getContrastColor( hex ) {
+	const c = ( hex || '#6366F1' ).replace( '#', '' );
+	const r = parseInt( c.substring( 0, 2 ), 16 ) / 255;
+	const g = parseInt( c.substring( 2, 4 ), 16 ) / 255;
+	const b = parseInt( c.substring( 4, 6 ), 16 ) / 255;
+	const lin = x => x <= 0.04045 ? x / 12.92 : Math.pow( ( x + 0.055 ) / 1.055, 2.4 );
+	const L = 0.2126 * lin( r ) + 0.7152 * lin( g ) + 0.0722 * lin( b );
+	return L > 0.35 ? '#1A1A2E' : '#ffffff';
+}
+
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
 function IconDashboard( { active } ) {
@@ -441,7 +454,8 @@ function IconSignOut( { color = '#6B7280' } ) {
 
 export default function PortalSidebar( { page } ) {
 	const { businessName, businessLogo, clientData, pluginUrl, brandColor, hasProjects } = window.cfPortalData || {};
-	const brandBg = brandColor || '#6366F1';
+	const brandBg        = brandColor || '#6366F1';
+	const brandTextColor = getContrastColor( brandBg );
 	const [ loggingOut, setLoggingOut ] = useState( false );
 
 	const initials = ( businessName || 'CF' )
@@ -481,10 +495,10 @@ export default function PortalSidebar( { page } ) {
 				<div className={ `cps-logo-wrap${ businessLogo ? ' cps-logo-wrap--image' : '' }` }>
 					{ businessLogo
 						? <img src={ businessLogo } alt={ businessName } />
-						: <span className="cps-logo-initials">{ initials }</span>
+						: <span className="cps-logo-initials" style={ { color: brandTextColor } }>{ initials }</span>
 					}
 				</div>
-				<span className="cps-biz-name">{ businessName || 'ClientFlow' }</span>
+				<span className="cps-biz-name" style={ { color: brandTextColor, textShadow: brandTextColor === '#ffffff' ? undefined : 'none' } }>{ businessName || 'ClientFlow' }</span>
 			</div>
 
 			<div className="cps-divider" />

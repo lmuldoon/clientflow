@@ -12,6 +12,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class ClientFlow_Portal_Data {
 
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all interpolated tables use $wpdb->prefix with trusted constants, not user input.
+
 	// -------------------------------------------------------------------------
 	// Client
 	// -------------------------------------------------------------------------

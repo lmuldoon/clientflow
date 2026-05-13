@@ -3,7 +3,7 @@
  * AI REST endpoints
  *
  * POST /wp-json/clientflow/v1/ai/process
- *   — Requires admin auth (cf_rest_require_auth)
+ *   — Requires admin auth (clientflow_rest_require_auth)
  *   — Forwards to CF AI Relay server
  *   — Returns { result, remaining }
  *
@@ -16,6 +16,7 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -28,8 +29,8 @@ add_action( 'rest_api_init', static function (): void {
 		'/ai/process',
 		[
 			'methods'             => 'POST',
-			'callback'            => 'cf_rest_ai_process',
-			'permission_callback' => 'cf_rest_require_auth',
+			'callback'            => 'clientflow_rest_ai_process',
+			'permission_callback' => 'clientflow_rest_require_auth',
 			'args'                => [
 				'action' => [
 					'required'          => true,
@@ -58,13 +59,13 @@ add_action( 'rest_api_init', static function (): void {
 		'/ai/test-connection',
 		[
 			'methods'             => 'POST',
-			'callback'            => 'cf_rest_ai_test_connection',
-			'permission_callback' => 'cf_rest_require_auth',
+			'callback'            => 'clientflow_rest_ai_test_connection',
+			'permission_callback' => 'clientflow_rest_require_auth',
 		]
 	);
 } );
 
-function cf_rest_ai_process( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_rest_ai_process( WP_REST_Request $request ): WP_REST_Response {
 	$user_id = get_current_user_id();
 	$action  = $request->get_param( 'action' );
 	$text    = $request->get_param( 'text' );
@@ -83,7 +84,7 @@ function cf_rest_ai_process( WP_REST_Request $request ): WP_REST_Response {
 	return new WP_REST_Response( $result, 200 );
 }
 
-function cf_rest_ai_test_connection(): WP_REST_Response {
+function clientflow_rest_ai_test_connection(): WP_REST_Response {
 	$relay_key = get_option( 'clientflow_license_key', '' );
 
 	if ( ! $relay_key ) {

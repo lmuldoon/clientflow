@@ -21,6 +21,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- View-scope variables; this file is only included from the admin page callback and never in global scope.
+
 // ─── Safe defaults ───────────────────────────────────────────────────────────
 $user_plan    = $user_plan    ?? 'free';
 $usage_data   = $usage_data   ?? [];
@@ -36,7 +38,7 @@ $feature_access = $feature_access ?? [];
  *
  * @return array{pct: int, status: string}
  */
-function cf_progress( ?int $used, ?int $limit ): array {
+function clientflow_progress( ?int $used, ?int $limit ): array {
 	if ( null === $limit || 0 === $limit ) {
 		return [ 'pct' => 0, 'status' => 'unlimited' ];
 	}
@@ -61,10 +63,10 @@ $is_agency  = 'agency' === $user_plan;
 $is_pro_or_above = in_array( $user_plan, [ 'pro', 'agency' ], true );
 
 // Usage progress.
-$ai_prog       = cf_progress( $usage_data['ai_requests'] ?? 0,  $usage_data['ai_limit'] ?? null );
-$prop_prog     = cf_progress( $usage_data['proposals'] ?? 0,    $usage_data['proposals_limit'] ?? null );
-$storage_prog  = cf_progress( $usage_data['storage_mb'] ?? 0,   $usage_data['storage_limit_mb'] ?? null );
-$team_prog     = cf_progress( $usage_data['team_seats'] ?? 1,   $usage_data['team_limit'] ?? 1 );
+$ai_prog       = clientflow_progress( $usage_data['ai_requests'] ?? 0,  $usage_data['ai_limit'] ?? null );
+$prop_prog     = clientflow_progress( $usage_data['proposals'] ?? 0,    $usage_data['proposals_limit'] ?? null );
+$storage_prog  = clientflow_progress( $usage_data['storage_mb'] ?? 0,   $usage_data['storage_limit_mb'] ?? null );
+$team_prog     = clientflow_progress( $usage_data['team_seats'] ?? 1,   $usage_data['team_limit'] ?? 1 );
 
 // Feature grid definition.
 $features = [
@@ -794,7 +796,7 @@ $upgrade_url = function_exists( 'clientflow_fs' ) ? clientflow_fs()->get_upgrade
                          <?php echo $tooltip ? 'data-tooltip="' . esc_attr( $tooltip ) . '"' : ''; ?>>
 
                         <div class="cf-feature-icon">
-                            <?php echo $feat['icon']; // SVG is safe — defined in PHP above. ?>
+                            <?php echo $feat['icon']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- SVG defined as PHP string literal above, not user input. ?>
                         </div>
 
                         <div class="cf-feature-name"><?php echo esc_html( $feat['label'] ); ?></div>

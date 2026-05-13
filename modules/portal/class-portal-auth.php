@@ -11,6 +11,7 @@
  */
 
 declare( strict_types = 1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Custom table queries and user meta lookups for portal auth.
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
@@ -284,7 +285,7 @@ class ClientFlow_Portal_Auth {
 	public static function rest_permission() {
 		if ( ! self::is_authenticated() ) {
 			return new WP_Error(
-				'cf_portal_unauthorized',
+				'clientflow_portal_unauthorized',
 				'Authentication required.',
 				[ 'status' => 401 ]
 			);
@@ -324,7 +325,7 @@ class ClientFlow_Portal_Auth {
 		$subject       = sprintf( 'Your login link for %s', $business_name );
 		$expiry_hours  = (int) ( self::TOKEN_TTL / 3600 );
 
-		$message = cf_email_html( [
+		$message = clientflow_email_html( [
 			'name'          => $user->display_name,
 			'business_name' => $business_name,
 			'body'          => '<p style="margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;">Click the button below to securely log in to your client portal. This link expires in <strong style="color:#1A1A2E;">' . $expiry_hours . ' hours</strong> and can only be used once.</p>',

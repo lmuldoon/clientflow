@@ -23,6 +23,7 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -59,8 +60,8 @@ add_action( 'rest_api_init', static function (): void {
 	// ── GET /projects ─────────────────────────────────────────────────────────
 	register_rest_route( $ns, '/projects', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_list_projects',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_list_projects',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'status'   => [ 'type' => 'string', 'default' => '', 'sanitize_callback' => 'sanitize_key' ],
 			'search'   => [ 'type' => 'string', 'default' => '', 'sanitize_callback' => 'sanitize_text_field' ],
@@ -74,16 +75,16 @@ add_action( 'rest_api_init', static function (): void {
 	// ── GET /projects/{id} ────────────────────────────────────────────────────
 	register_rest_route( $ns, '/projects/(?P<id>\d+)', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_get_project',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_get_project',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 
 	// ── POST /projects/{id}/update ────────────────────────────────────────────
 	register_rest_route( $ns, '/projects/(?P<id>\d+)/update', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_update_project',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_update_project',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id'          => [ 'type' => 'integer', 'required' => true ],
 			'name'        => [ 'type' => 'string', 'required' => false, 'sanitize_callback' => 'sanitize_text_field' ],
@@ -95,24 +96,24 @@ add_action( 'rest_api_init', static function (): void {
 	// ── DELETE /projects/{id} ─────────────────────────────────────────────────
 	register_rest_route( $ns, '/projects/(?P<id>\d+)', [
 		'methods'             => WP_REST_Server::DELETABLE,
-		'callback'            => 'cf_rest_delete_project',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_delete_project',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 
 	// ── GET /projects/{id}/payments ───────────────────────────────────────────
 	register_rest_route( $ns, '/projects/(?P<id>\d+)/payments', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_get_project_payments',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_get_project_payments',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 
 	// ── POST /projects/{id}/milestones ────────────────────────────────────────
 	register_rest_route( $ns, '/projects/(?P<id>\d+)/milestones', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_create_milestone',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_create_milestone',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id'          => [ 'type' => 'integer', 'required' => true ],
 			'title'       => [ 'type' => 'string',  'required' => true,  'sanitize_callback' => 'sanitize_text_field' ],
@@ -124,8 +125,8 @@ add_action( 'rest_api_init', static function (): void {
 	// ── POST /projects/{id}/milestones/{mid}/update ───────────────────────────
 	register_rest_route( $ns, '/projects/(?P<id>\d+)/milestones/(?P<mid>\d+)/update', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_update_milestone',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_update_milestone',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id'          => [ 'type' => 'integer', 'required' => true ],
 			'mid'         => [ 'type' => 'integer', 'required' => true ],
@@ -139,8 +140,8 @@ add_action( 'rest_api_init', static function (): void {
 	// ── DELETE /projects/{id}/milestones/{mid} ────────────────────────────────
 	register_rest_route( $ns, '/projects/(?P<id>\d+)/milestones/(?P<mid>\d+)', [
 		'methods'             => WP_REST_Server::DELETABLE,
-		'callback'            => 'cf_rest_delete_milestone',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_delete_milestone',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id'  => [ 'type' => 'integer', 'required' => true ],
 			'mid' => [ 'type' => 'integer', 'required' => true ],
@@ -150,8 +151,8 @@ add_action( 'rest_api_init', static function (): void {
 	// ── POST /projects/{id}/milestones/reorder ────────────────────────────────
 	register_rest_route( $ns, '/projects/(?P<id>\d+)/milestones/reorder', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_reorder_milestones',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_reorder_milestones',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id'          => [ 'type' => 'integer', 'required' => true ],
 			'ordered_ids' => [ 'type' => 'array',   'required' => true ],
@@ -161,8 +162,8 @@ add_action( 'rest_api_init', static function (): void {
 	// ── POST /projects/{id}/milestones/{mid}/submit ───────────────────────────
 	register_rest_route( $ns, '/projects/(?P<id>\d+)/milestones/(?P<mid>\d+)/submit', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_submit_milestone',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_submit_milestone',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id'  => [ 'type' => 'integer', 'required' => true ],
 			'mid' => [ 'type' => 'integer', 'required' => true ],
@@ -172,14 +173,14 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Portal: GET /portal/projects ──────────────────────────────────────────
 	register_rest_route( $ns, '/portal/projects', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_portal_rest_list_projects',
+		'callback'            => 'clientflow_portal_rest_list_projects',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 	] );
 
 	// ── Portal: GET /portal/projects/{id} ─────────────────────────────────────
 	register_rest_route( $ns, '/portal/projects/(?P<id>\d+)', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_portal_rest_get_project',
+		'callback'            => 'clientflow_portal_rest_get_project',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
@@ -187,7 +188,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Portal: POST /portal/projects/{id}/milestones/{mid}/approve ───────────
 	register_rest_route( $ns, '/portal/projects/(?P<id>\d+)/milestones/(?P<mid>\d+)/approve', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_portal_rest_approve_milestone',
+		'callback'            => 'clientflow_portal_rest_approve_milestone',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 		'args'                => [
 			'id'  => [ 'type' => 'integer', 'required' => true ],
@@ -200,8 +201,8 @@ add_action( 'rest_api_init', static function (): void {
 // Admin handlers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function cf_rest_list_projects( WP_REST_Request $request ): WP_REST_Response {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_list_projects( WP_REST_Request $request ): WP_REST_Response {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$result  = ClientFlow_Project::list( $user_id, [
 		'status'   => $request->get_param( 'status' ),
 		'search'   => $request->get_param( 'search' ),
@@ -213,10 +214,10 @@ function cf_rest_list_projects( WP_REST_Request $request ): WP_REST_Response {
 	return new WP_REST_Response( $result, 200 );
 }
 
-function cf_rest_get_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_get_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	global $wpdb;
 
-	$user_id = cf_get_owner_id( get_current_user_id() );
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 	$result  = ClientFlow_Project::get( $id, $user_id );
 	if ( is_wp_error( $result ) ) return $result;
@@ -240,7 +241,7 @@ function cf_rest_get_project( WP_REST_Request $request ): WP_REST_Response|WP_Er
 /**
  * Returns a WP_Error if the given project is locked (completed + fully paid), null otherwise.
  */
-function cf_project_lock_check( int $project_id, int $owner_id ): ?WP_Error {
+function clientflow_project_lock_check( int $project_id, int $owner_id ): ?WP_Error {
 	global $wpdb;
 
 	$row = $wpdb->get_row(
@@ -273,12 +274,12 @@ function cf_project_lock_check( int $project_id, int $owner_id ): ?WP_Error {
 		: null;
 }
 
-function cf_rest_update_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_update_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	global $wpdb;
 
-	$user_id = cf_get_owner_id( get_current_user_id() );
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 
-	if ( ! cf_can_user( $user_id, 'use_projects' ) ) {
+	if ( ! clientflow_can_user( $user_id, 'use_projects' ) ) {
 		return new WP_Error( 'projects_not_available', __( 'Projects are available on the Agency plan.', 'clientflow' ), [ 'status' => 403 ] );
 	}
 
@@ -290,7 +291,7 @@ function cf_rest_update_project( WP_REST_Request $request ): WP_REST_Response|WP
 	);
 
 	// Gate: completed + fully-paid projects are locked — no further edits allowed.
-	$lock_error = cf_project_lock_check( $id, $user_id );
+	$lock_error = clientflow_project_lock_check( $id, $user_id );
 	if ( $lock_error ) return $lock_error;
 
 	// Gate: cannot mark completed until all milestones are done.
@@ -320,8 +321,8 @@ function cf_rest_update_project( WP_REST_Request $request ): WP_REST_Response|WP
 				[ '%d', '%d' ]
 			);
 		}
-		cf_send_project_completion_email( $project );
-		cf_maybe_send_testimonial_email( $project, $user_id );
+		clientflow_send_project_completion_email( $project );
+		clientflow_maybe_send_testimonial_email( $project, $user_id );
 	} elseif ( ! is_wp_error( $project ) && 'completed' === ( $project['status'] ?? '' ) && ! empty( $project['proposal_id'] ) ) {
 		// Project is already complete — sync the proposal status in case it was missed.
 		$wpdb->query(
@@ -338,10 +339,10 @@ function cf_rest_update_project( WP_REST_Request $request ): WP_REST_Response|WP
 	return new WP_REST_Response( [ 'project' => $project ], 200 );
 }
 
-function cf_rest_delete_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_delete_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 
-	if ( ! cf_can_user( $user_id, 'use_projects' ) ) {
+	if ( ! clientflow_can_user( $user_id, 'use_projects' ) ) {
 		return new WP_Error( 'projects_not_available', __( 'Projects are available on the Agency plan.', 'clientflow' ), [ 'status' => 403 ] );
 	}
 
@@ -351,10 +352,10 @@ function cf_rest_delete_project( WP_REST_Request $request ): WP_REST_Response|WP
 	return new WP_REST_Response( [ 'deleted' => true, 'id' => $id ], 200 );
 }
 
-function cf_rest_get_project_payments( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_get_project_payments( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	global $wpdb;
 
-	$user_id = cf_get_owner_id( get_current_user_id() );
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 
 	$project = ClientFlow_Project::get( $id, $user_id );
@@ -403,15 +404,15 @@ function cf_rest_get_project_payments( WP_REST_Request $request ): WP_REST_Respo
 	], 200 );
 }
 
-function cf_rest_create_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_create_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 
-	if ( ! cf_can_user( $user_id, 'use_projects' ) ) {
+	if ( ! clientflow_can_user( $user_id, 'use_projects' ) ) {
 		return new WP_Error( 'projects_not_available', __( 'Projects are available on the Agency plan.', 'clientflow' ), [ 'status' => 403 ] );
 	}
 
-	$lock_error = cf_project_lock_check( $project_id, $user_id );
+	$lock_error = clientflow_project_lock_check( $project_id, $user_id );
 	if ( $lock_error ) return $lock_error;
 
 	// Ownership check.
@@ -430,12 +431,12 @@ function cf_rest_create_milestone( WP_REST_Request $request ): WP_REST_Response|
 	return new WP_REST_Response( [ 'project' => $project ], 201 );
 }
 
-function cf_rest_update_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_update_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 	$mid        = (int) $request->get_param( 'mid' );
 
-	if ( ! cf_can_user( $user_id, 'use_projects' ) ) {
+	if ( ! clientflow_can_user( $user_id, 'use_projects' ) ) {
 		return new WP_Error( 'projects_not_available', __( 'Projects are available on the Agency plan.', 'clientflow' ), [ 'status' => 403 ] );
 	}
 	$data       = array_filter(
@@ -477,18 +478,18 @@ function cf_rest_update_milestone( WP_REST_Request $request ): WP_REST_Response|
 				break;
 			}
 		}
-		cf_send_milestone_complete_email( $project, $milestone_title );
+		clientflow_send_milestone_complete_email( $project, $milestone_title );
 	}
 
 	return new WP_REST_Response( [ 'project' => $project ], 200 );
 }
 
-function cf_rest_delete_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_delete_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 	$mid        = (int) $request->get_param( 'mid' );
 
-	if ( ! cf_can_user( $user_id, 'use_projects' ) ) {
+	if ( ! clientflow_can_user( $user_id, 'use_projects' ) ) {
 		return new WP_Error( 'projects_not_available', __( 'Projects are available on the Agency plan.', 'clientflow' ), [ 'status' => 403 ] );
 	}
 
@@ -498,11 +499,11 @@ function cf_rest_delete_milestone( WP_REST_Request $request ): WP_REST_Response|
 	return new WP_REST_Response( [ 'project' => $project ], 200 );
 }
 
-function cf_rest_reorder_milestones( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_reorder_milestones( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 
-	if ( ! cf_can_user( $user_id, 'use_projects' ) ) {
+	if ( ! clientflow_can_user( $user_id, 'use_projects' ) ) {
 		return new WP_Error( 'projects_not_available', __( 'Projects are available on the Agency plan.', 'clientflow' ), [ 'status' => 403 ] );
 	}
 
@@ -513,8 +514,8 @@ function cf_rest_reorder_milestones( WP_REST_Request $request ): WP_REST_Respons
 	return new WP_REST_Response( [ 'project' => $project ], 200 );
 }
 
-function cf_rest_submit_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_submit_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 	$mid        = (int) $request->get_param( 'mid' );
 
@@ -534,7 +535,7 @@ function cf_rest_submit_milestone( WP_REST_Request $request ): WP_REST_Response|
 			break;
 		}
 	}
-	cf_send_milestone_submitted_email( $project, $milestone_title );
+	clientflow_send_milestone_submitted_email( $project, $milestone_title );
 
 	return new WP_REST_Response( [ 'project' => $project ], 200 );
 }
@@ -543,22 +544,22 @@ function cf_rest_submit_milestone( WP_REST_Request $request ): WP_REST_Response|
 // Portal handlers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function cf_portal_rest_list_projects( WP_REST_Request $request ): WP_REST_Response {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_portal_rest_list_projects( WP_REST_Request $request ): WP_REST_Response {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$projects = ClientFlow_Portal_Data::get_projects( $user_id );
 	return new WP_REST_Response( [ 'projects' => $projects ], 200 );
 }
 
-function cf_portal_rest_get_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_portal_rest_get_project( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 	$project = ClientFlow_Portal_Data::get_project( $user_id, $id );
 	if ( is_wp_error( $project ) ) return $project;
 	return new WP_REST_Response( [ 'project' => $project ], 200 );
 }
 
-function cf_portal_rest_approve_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_portal_rest_approve_milestone( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 	$mid        = (int) $request->get_param( 'mid' );
 
@@ -581,7 +582,7 @@ function cf_portal_rest_approve_milestone( WP_REST_Request $request ): WP_REST_R
 		}
 	}
 	if ( ! is_wp_error( $project ) ) {
-		cf_send_milestone_approved_email( $project, $milestone_title );
+		clientflow_send_milestone_approved_email( $project, $milestone_title );
 	}
 
 	return new WP_REST_Response( [ 'project' => $project ], 200 );
@@ -597,11 +598,11 @@ function cf_portal_rest_approve_milestone( WP_REST_Request $request ): WP_REST_R
  * @param array $project Project row (must contain client_id or proposal_id).
  * @return string Client email, or empty string if not resolvable.
  */
-function cf_project_client_email( array $project ): string {
-	return cf_project_client_data( $project )['email'];
+function clientflow_project_client_email( array $project ): string {
+	return clientflow_project_client_data( $project )['email'];
 }
 
-function cf_project_client_data( array $project ): array {
+function clientflow_project_client_data( array $project ): array {
 	global $wpdb;
 
 	$client_id = (int) ( $project['client_id'] ?? 0 );
@@ -627,8 +628,8 @@ function cf_project_client_data( array $project ): array {
  * @param array  $project        Full project row (from ClientFlow_Project::get).
  * @param string $milestone_title
  */
-function cf_send_milestone_submitted_email( array $project, string $milestone_title ): void {
-	$client = cf_project_client_data( $project );
+function clientflow_send_milestone_submitted_email( array $project, string $milestone_title ): void {
+	$client = clientflow_project_client_data( $project );
 	if ( ! $client['email'] ) return;
 
 	$project_name  = esc_html( $project['name'] ?? '' );
@@ -648,7 +649,7 @@ function cf_send_milestone_submitted_email( array $project, string $milestone_ti
 			Log in to your portal to review and approve this milestone.
 		</p>";
 
-	$message = cf_email_html( [
+	$message = clientflow_email_html( [
 		'name'      => $client['name'],
 		'body'      => $body_html,
 		'cta_label' => 'Review Milestone',
@@ -664,7 +665,7 @@ function cf_send_milestone_submitted_email( array $project, string $milestone_ti
  * @param array  $project        Portal project row (includes owner_id, name).
  * @param string $milestone_title
  */
-function cf_send_milestone_approved_email( array $project, string $milestone_title ): void {
+function clientflow_send_milestone_approved_email( array $project, string $milestone_title ): void {
 	$owner = get_userdata( (int) ( $project['owner_id'] ?? 0 ) );
 	if ( ! $owner || ! $owner->user_email ) return;
 
@@ -686,7 +687,7 @@ function cf_send_milestone_approved_email( array $project, string $milestone_tit
 			You can now mark this milestone as complete in your projects dashboard.
 		</p>";
 
-	$message = cf_email_html( [
+	$message = clientflow_email_html( [
 		'name'      => $owner->display_name,
 		'body'      => $body_html,
 		'cta_label' => 'View Project',
@@ -702,8 +703,8 @@ function cf_send_milestone_approved_email( array $project, string $milestone_tit
  * @param array  $project        Full project row (from ClientFlow_Project::get).
  * @param string $milestone_title
  */
-function cf_send_milestone_complete_email( array $project, string $milestone_title ): void {
-	$client = cf_project_client_data( $project );
+function clientflow_send_milestone_complete_email( array $project, string $milestone_title ): void {
+	$client = clientflow_project_client_data( $project );
 	if ( ! $client['email'] ) return;
 
 	$project_name   = esc_html( $project['name'] ?? '' );
@@ -723,7 +724,7 @@ function cf_send_milestone_complete_email( array $project, string $milestone_tit
 			Log in to your portal to see the latest progress on your project.
 		</p>";
 
-	$message = cf_email_html( [
+	$message = clientflow_email_html( [
 		'name'      => $client['name'],
 		'body'      => $body_html,
 		'cta_label' => 'View Project',
@@ -738,8 +739,8 @@ function cf_send_milestone_complete_email( array $project, string $milestone_tit
  *
  * @param array $project Full project row (from ClientFlow_Project::get).
  */
-function cf_send_project_completion_email( array $project ): void {
-	$client = cf_project_client_data( $project );
+function clientflow_send_project_completion_email( array $project ): void {
+	$client = clientflow_project_client_data( $project );
 	if ( ! $client['email'] ) return;
 
 	global $wpdb;
@@ -788,7 +789,7 @@ function cf_send_project_completion_email( array $project ): void {
 			Log in to your portal to view the final summary.
 		</p>";
 
-	$message = cf_email_html( [
+	$message = clientflow_email_html( [
 		'name'      => $client['name'],
 		'body'      => $body_html,
 		'cta_label' => 'View Project',
@@ -798,9 +799,9 @@ function cf_send_project_completion_email( array $project ): void {
 	wp_mail( $client['email'], $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
 }
 
-function cf_maybe_send_testimonial_email( array $project, int $owner_id ): void {
+function clientflow_maybe_send_testimonial_email( array $project, int $owner_id ): void {
 	if ( '1' !== get_option( 'clientflow_testimonial_enabled' ) ) return;
-	if ( ! cf_can_user( $owner_id, 'use_testimonials' ) ) return;
+	if ( ! clientflow_can_user( $owner_id, 'use_testimonials' ) ) return;
 
 	$proposal_id = (int) ( $project['proposal_id'] ?? 0 );
 	if ( ! $proposal_id ) return;
@@ -854,8 +855,9 @@ function cf_maybe_send_testimonial_email( array $project, int $owner_id ): void 
 
 	wp_mail(
 		$client_row['email'],
+		/* translators: %s is the proposal title */
 		sprintf( __( 'How did we do? — %s', 'clientflow' ), $proposal['title'] ?? '' ),
-		cf_email_html( $email_args ),
+		clientflow_email_html( $email_args ),
 		[ 'Content-Type: text/html; charset=UTF-8' ]
 	);
 }

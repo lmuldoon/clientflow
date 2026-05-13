@@ -30,37 +30,37 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 add_action( 'init', static function (): void {
 	// Primary token query var.
-	add_rewrite_tag( '%cf_proposal_token%', '([a-zA-Z0-9\-]+)' );
+	add_rewrite_tag( '%clientflow_proposal_token%', '([a-zA-Z0-9\-]+)' );
 	// Payment result: 'success' | 'cancel'
-	add_rewrite_tag( '%cf_payment_result%', '(success|cancel)' );
+	add_rewrite_tag( '%clientflow_payment_result%', '(success|cancel)' );
 	// Preview token — registered before the generic proposal rule so it matches first.
-	add_rewrite_tag( '%cf_preview_token%', '([a-zA-Z0-9\-]+)' );
+	add_rewrite_tag( '%clientflow_preview_token%', '([a-zA-Z0-9\-]+)' );
 
 	// /proposals/preview/{token}[/]  — internal preview viewer (read-only).
 	add_rewrite_rule(
 		'^proposals/preview/([a-zA-Z0-9\-]+)/?$',
-		'index.php?cf_preview_token=$matches[1]',
+		'index.php?clientflow_preview_token=$matches[1]',
 		'top'
 	);
 
 	// /proposals/{token}/[/]  — proposal viewer.
 	add_rewrite_rule(
 		'^proposals/([a-zA-Z0-9\-]+)/?$',
-		'index.php?cf_proposal_token=$matches[1]',
+		'index.php?clientflow_proposal_token=$matches[1]',
 		'top'
 	);
 
 	// /proposals/{token}/success[/]  — payment success page.
 	add_rewrite_rule(
 		'^proposals/([a-zA-Z0-9\-]+)/success/?$',
-		'index.php?cf_proposal_token=$matches[1]&cf_payment_result=success',
+		'index.php?clientflow_proposal_token=$matches[1]&clientflow_payment_result=success',
 		'top'
 	);
 
 	// /proposals/{token}/cancel[/]  — payment cancelled page.
 	add_rewrite_rule(
 		'^proposals/([a-zA-Z0-9\-]+)/cancel/?$',
-		'index.php?cf_proposal_token=$matches[1]&cf_payment_result=cancel',
+		'index.php?clientflow_proposal_token=$matches[1]&clientflow_payment_result=cancel',
 		'top'
 	);
 }, 10 );
@@ -71,7 +71,7 @@ add_action( 'template_redirect', static function (): void {
 	$template = CLIENTFLOW_DIR . 'client/template.php';
 
 	// ── Preview URL: /proposals/preview/{token} ──────────────────────────────
-	$preview_token = get_query_var( 'cf_preview_token' );
+	$preview_token = get_query_var( 'clientflow_preview_token' );
 
 	if ( $preview_token ) {
 		if ( ! file_exists( $template ) ) {
@@ -82,7 +82,7 @@ add_action( 'template_redirect', static function (): void {
 			);
 		}
 
-		$cf_preview_token = sanitize_text_field( $preview_token );
+		$clientflow_preview_token = sanitize_text_field( $preview_token );
 
 		// phpcs:ignore WordPressVIPMinimum.Files.IncludingFile.UsingVariable
 		include $template;
@@ -90,7 +90,7 @@ add_action( 'template_redirect', static function (): void {
 	}
 
 	// ── Standard proposal URL: /proposals/{token} ────────────────────────────
-	$token = get_query_var( 'cf_proposal_token' );
+	$token = get_query_var( 'clientflow_proposal_token' );
 
 	if ( ! $token ) {
 		return;
@@ -105,10 +105,11 @@ add_action( 'template_redirect', static function (): void {
 	}
 
 	// Pass sanitised variables to the template.
-	$cf_proposal_token  = sanitize_text_field( $token );
-	$cf_payment_result  = sanitize_key( get_query_var( 'cf_payment_result', '' ) );
+	$clientflow_proposal_token  = sanitize_text_field( $token );
+	$clientflow_payment_result  = sanitize_key( get_query_var( 'clientflow_payment_result', '' ) );
 	// Stripe passes ?session_id=cs_xxx on the success redirect.
-	$cf_session_id      = sanitize_text_field( $_GET['session_id'] ?? '' );
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only Stripe redirect parameter, no state change occurs here.
+	$clientflow_session_id      = sanitize_text_field( wp_unslash( $_GET['session_id'] ?? '' ) );
 
 	// phpcs:ignore WordPressVIPMinimum.Files.IncludingFile.UsingVariable
 	include $template;

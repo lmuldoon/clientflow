@@ -20,6 +20,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class ClientFlow_Project {
 
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; table() returns a trusted constant, not user input.
+
 	private const TABLE = 'clientflow_projects';
 
 	private static function table(): string {
@@ -243,7 +245,7 @@ class ClientFlow_Project {
 		// Set completed_at when transitioning to completed.
 		if ( ( $update['status'] ?? '' ) === 'completed' ) {
 			$update['completed_at'] = current_time( 'mysql' );
-			do_action( 'cf_project_completed', $id, $owner_id );
+			do_action( 'clientflow_project_completed', $id, $owner_id );
 		}
 
 		$update['updated_at'] = current_time( 'mysql' );

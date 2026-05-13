@@ -18,6 +18,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class ClientFlow_Analytics {
 
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use $wpdb->prefix with trusted constants, not user input.
+
 	private const CACHE_TTL = 300; // 5 minutes
 
 	// ── KPIs ──────────────────────────────────────────────────────────────────
@@ -239,7 +241,7 @@ class ClientFlow_Analytics {
 	 * @return array [ { type, label, timestamp, meta } … ]
 	 */
 	public static function activity_feed( int $owner_id, int $limit = 20 ): array {
-		$cache_key = 'cf_analytics_feed_' . $owner_id;
+		$cache_key = 'clientflow_analytics_feed_' . $owner_id;
 		$cached    = get_transient( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
@@ -302,7 +304,7 @@ class ClientFlow_Analytics {
 			'%_transient_cf_analytics_%' . $owner_id . '%',
 			'%_transient_timeout_cf_analytics_%' . $owner_id . '%'
 		) );
-		delete_transient( 'cf_analytics_feed_' . $owner_id );
+		delete_transient( 'clientflow_analytics_feed_' . $owner_id );
 	}
 
 	// ── CSV export ─────────────────────────────────────────────────────────────
@@ -349,14 +351,14 @@ class ClientFlow_Analytics {
 			] );
 		}
 
-		fclose( $out );
+		fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- closing a php://output stream, not a filesystem file.
 		exit;
 	}
 
 	// ── Helpers ────────────────────────────────────────────────────────────────
 
 	private static function key( string $method, int $owner_id, string $from, string $to ): string {
-		return 'cf_analytics_' . $method . '_' . $owner_id . '_' . md5( $from . $to );
+		return 'clientflow_analytics_' . $method . '_' . $owner_id . '_' . md5( $from . $to );
 	}
 }
 

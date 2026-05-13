@@ -26,6 +26,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class ClientFlow_Proposal_Client {
 
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; table() returns a trusted constant, not user input.
+
 	/**
 	 * Fields returned to the client. Excludes owner_id and internal fields.
 	 *
@@ -191,8 +193,8 @@ class ClientFlow_Proposal_Client {
 			[
 				'proposal_id' => $proposal['id'],
 				'event_type'  => 'accepted',
-				'user_ip'     => sanitize_text_field( substr( $_SERVER['REMOTE_ADDR'] ?? '', 0, 45 ) ),
-				'user_agent'  => sanitize_text_field( substr( $_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500 ) ),
+				'user_ip'     => substr( sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) ), 0, 45 ),
+				'user_agent'  => substr( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ?? '' ) ), 0, 500 ),
 				'timestamp'   => $now,
 				'metadata'    => null,
 			],
@@ -208,7 +210,7 @@ class ClientFlow_Proposal_Client {
 				$proposal['id']
 			)
 		);
-		do_action( 'cf_proposal_accepted', $proposal['id'], $owner_id );
+		do_action( 'clientflow_proposal_accepted', $proposal['id'], $owner_id );
 
 		return self::get_by_token( $token );
 	}
@@ -284,8 +286,8 @@ class ClientFlow_Proposal_Client {
 			[
 				'proposal_id' => $proposal['id'],
 				'event_type'  => 'declined',
-				'user_ip'     => sanitize_text_field( substr( $_SERVER['REMOTE_ADDR'] ?? '', 0, 45 ) ),
-				'user_agent'  => sanitize_text_field( substr( $_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500 ) ),
+				'user_ip'     => substr( sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) ), 0, 45 ),
+				'user_agent'  => substr( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ?? '' ) ), 0, 500 ),
 				'timestamp'   => $now,
 				'metadata'    => '' !== $reason ? wp_json_encode( [ 'reason' => $reason ] ) : null,
 			],
@@ -293,7 +295,7 @@ class ClientFlow_Proposal_Client {
 		);
 
 		self::notify_owner( $proposal['id'], 'declined' );
-		do_action( 'cf_proposal_declined', (int) $proposal['id'], (int) $proposal['owner_id'] );
+		do_action( 'clientflow_proposal_declined', (int) $proposal['id'], (int) $proposal['owner_id'] );
 
 		return self::get_by_token( $token );
 	}
@@ -347,8 +349,8 @@ class ClientFlow_Proposal_Client {
 			[
 				'proposal_id' => $proposal['id'],
 				'event_type'  => 'revision_requested',
-				'user_ip'     => sanitize_text_field( substr( $_SERVER['REMOTE_ADDR'] ?? '', 0, 45 ) ),
-				'user_agent'  => sanitize_text_field( substr( $_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500 ) ),
+				'user_ip'     => substr( sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) ), 0, 45 ),
+				'user_agent'  => substr( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ?? '' ) ), 0, 500 ),
 				'timestamp'   => $now,
 				'metadata'    => '' !== $note ? wp_json_encode( [ 'note' => $note ] ) : null,
 			],
@@ -356,7 +358,7 @@ class ClientFlow_Proposal_Client {
 		);
 
 		self::notify_owner( $proposal['id'], 'revision_requested', $note );
-		do_action( 'cf_revision_requested', (int) $proposal['id'], (int) $proposal['owner_id'] );
+		do_action( 'clientflow_revision_requested', (int) $proposal['id'], (int) $proposal['owner_id'] );
 
 		return self::get_by_token( $token );
 	}
@@ -430,8 +432,9 @@ class ClientFlow_Proposal_Client {
 		$client = $row['client_name'] ?: __( 'A client', 'clientflow' );
 
 		if ( 'accepted' === $event ) {
+			/* translators: %s is the proposal title */
 			$subject   = sprintf( __( '🎉 Proposal Accepted: %s', 'clientflow' ), $row['title'] );
-			$body_html = cf_email_html( [
+			$body_html = clientflow_email_html( [
 				'body'      => '<p style="margin:0;font-size:16px;color:#6B7280;line-height:1.65;"><strong style="color:#1A1A2E;">' . esc_html( $client ) . '</strong> has accepted your proposal <em>' . esc_html( $row['title'] ) . '</em>.</p>',
 				'cta_label' => __( 'View Proposal', 'clientflow' ),
 				'cta_url'   => admin_url( 'admin.php?page=clientflow-proposals' ),
@@ -440,15 +443,17 @@ class ClientFlow_Proposal_Client {
 			$note_html = '' !== $note
 				? '<p style="margin:16px 0 0;font-size:15px;color:#374151;line-height:1.65;background:#F9FAFB;border-left:3px solid #6366F1;padding:12px 16px;border-radius:0 8px 8px 0;"><strong>' . __( 'Their note:', 'clientflow' ) . '</strong> ' . nl2br( esc_html( $note ) ) . '</p>'
 				: '';
+			/* translators: %s is the proposal title */
 			$subject   = sprintf( __( 'Changes Requested: %s', 'clientflow' ), $row['title'] );
-			$body_html = cf_email_html( [
+			$body_html = clientflow_email_html( [
 				'body'      => '<p style="margin:0;font-size:16px;color:#6B7280;line-height:1.65;"><strong style="color:#1A1A2E;">' . esc_html( $client ) . '</strong> has requested changes on <em>' . esc_html( $row['title'] ) . '</em>.</p>' . $note_html,
 				'cta_label' => __( 'Review & Edit', 'clientflow' ),
 				'cta_url'   => admin_url( 'admin.php?page=clientflow-proposals' ),
 			] );
 		} else {
+			/* translators: %s is the proposal title */
 			$subject   = sprintf( __( 'Proposal Declined: %s', 'clientflow' ), $row['title'] );
-			$body_html = cf_email_html( [
+			$body_html = clientflow_email_html( [
 				'body'      => '<p style="margin:0;font-size:16px;color:#6B7280;line-height:1.65;"><strong style="color:#1A1A2E;">' . esc_html( $client ) . '</strong> has declined your proposal <em>' . esc_html( $row['title'] ) . '</em>. Log in to view details.</p>',
 				'cta_label' => __( 'View Proposal', 'clientflow' ),
 				'cta_url'   => admin_url( 'admin.php?page=clientflow-proposals' ),

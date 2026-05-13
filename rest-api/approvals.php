@@ -18,6 +18,7 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -45,16 +46,16 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Admin: list ──────────────────────────────────────────────────────────
 	register_rest_route( $ns, "/projects/{$proj_id}/approvals", [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_list_approvals',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_list_approvals',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 
 	// ── Admin: create ────────────────────────────────────────────────────────
 	register_rest_route( $ns, "/projects/{$proj_id}/approvals", [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_create_approval',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_create_approval',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id'          => [ 'type' => 'integer', 'required' => true ],
 			'type'        => [ 'type' => 'string',  'required' => false, 'default' => 'other' ],
@@ -65,8 +66,8 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Admin: delete ────────────────────────────────────────────────────────
 	register_rest_route( $ns, "/projects/{$proj_id}/approvals/{$approv_id}", [
 		'methods'             => WP_REST_Server::DELETABLE,
-		'callback'            => 'cf_rest_delete_approval',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_delete_approval',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id'  => [ 'type' => 'integer', 'required' => true ],
 			'aid' => [ 'type' => 'integer', 'required' => true ],
@@ -76,7 +77,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Portal: list ─────────────────────────────────────────────────────────
 	register_rest_route( $ns, "/portal/projects/{$proj_id}/approvals", [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_portal_rest_list_approvals',
+		'callback'            => 'clientflow_portal_rest_list_approvals',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
@@ -84,7 +85,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── Portal: respond ──────────────────────────────────────────────────────
 	register_rest_route( $ns, "/portal/approvals/{$approv_id}/respond", [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_portal_rest_respond_approval',
+		'callback'            => 'clientflow_portal_rest_respond_approval',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 		'args'                => [
 			'aid'     => [ 'type' => 'integer', 'required' => true ],
@@ -96,19 +97,19 @@ add_action( 'rest_api_init', static function (): void {
 
 // ── Admin handlers ────────────────────────────────────────────────────────────
 
-function cf_rest_list_approvals( WP_REST_Request $request ): WP_REST_Response {
-	$owner_id   = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_list_approvals( WP_REST_Request $request ): WP_REST_Response {
+	$owner_id   = clientflow_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 	$approvals  = ClientFlow_Approval::list( $project_id, $owner_id );
 
 	return new WP_REST_Response( [ 'approvals' => $approvals ], 200 );
 }
 
-function cf_rest_create_approval( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$owner_id   = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_create_approval( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$owner_id   = clientflow_get_owner_id( get_current_user_id() );
 	$project_id = (int) $request->get_param( 'id' );
 
-	$lock_error = cf_project_lock_check( $project_id, $owner_id );
+	$lock_error = clientflow_project_lock_check( $project_id, $owner_id );
 	if ( $lock_error ) {
 		return new WP_Error(
 			'project_locked',
@@ -131,7 +132,7 @@ function cf_rest_create_approval( WP_REST_Request $request ): WP_REST_Response|W
 	return new WP_REST_Response( [ 'approvals' => $approvals ], 201 );
 }
 
-function cf_rest_delete_approval( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_delete_approval( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$owner_id    = get_current_user_id();
 	$approval_id = (int) $request->get_param( 'aid' );
 	$result      = ClientFlow_Approval::delete( $approval_id, $owner_id );
@@ -145,7 +146,7 @@ function cf_rest_delete_approval( WP_REST_Request $request ): WP_REST_Response|W
 
 // ── Portal handlers ───────────────────────────────────────────────────────────
 
-function cf_portal_rest_list_approvals( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_portal_rest_list_approvals( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$client_id  = get_current_user_id();
 	$project_id = (int) $request->get_param( 'id' );
 	$result     = ClientFlow_Approval::get_for_client( $project_id, $client_id );
@@ -157,7 +158,7 @@ function cf_portal_rest_list_approvals( WP_REST_Request $request ): WP_REST_Resp
 	return new WP_REST_Response( [ 'approvals' => $result ], 200 );
 }
 
-function cf_portal_rest_respond_approval( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_portal_rest_respond_approval( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	global $wpdb;
 
 	$client_id   = get_current_user_id();

@@ -19,6 +19,7 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -35,21 +36,21 @@ add_action( 'rest_api_init', static function (): void {
 	// ── GET /user/plan ────────────────────────────────────────────────────────
 	register_rest_route( $ns, '/user/plan', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_get_user_plan',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_get_user_plan',
+		'permission_callback' => 'clientflow_rest_require_auth',
 	] );
 
 	// ── POST /user/can ────────────────────────────────────────────────────────
 	register_rest_route( $ns, '/user/can', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_check_feature',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_check_feature',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'feature' => [
 				'required'          => true,
 				'type'              => 'string',
 				'sanitize_callback' => 'sanitize_key',
-				'validate_callback' => 'cf_rest_is_valid_feature',
+				'validate_callback' => 'clientflow_rest_is_valid_feature',
 				'description'       => 'Feature slug to check (e.g. "use_ai", "create_proposal").',
 			],
 			'options' => [
@@ -64,21 +65,21 @@ add_action( 'rest_api_init', static function (): void {
 	// ── GET /user/usage ───────────────────────────────────────────────────────
 	register_rest_route( $ns, '/user/usage', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_get_usage',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_get_usage',
+		'permission_callback' => 'clientflow_rest_require_auth',
 	] );
 
 	// ── POST /user/log-usage ──────────────────────────────────────────────────
 	register_rest_route( $ns, '/user/log-usage', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_log_usage',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_log_usage',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'feature' => [
 				'required'          => true,
 				'type'              => 'string',
 				'sanitize_callback' => 'sanitize_key',
-				'validate_callback' => 'cf_rest_is_valid_feature',
+				'validate_callback' => 'clientflow_rest_is_valid_feature',
 			],
 			'meta' => [
 				'required'    => false,
@@ -92,7 +93,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── GET /admin/usage-report ───────────────────────────────────────────────
 	register_rest_route( $ns, '/admin/usage-report', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_usage_report',
+		'callback'            => 'clientflow_rest_usage_report',
 		'permission_callback' => static function (): bool {
 			return current_user_can( 'manage_options' );
 		},
@@ -117,7 +118,7 @@ add_action( 'rest_api_init', static function (): void {
  *
  * @return true|WP_Error
  */
-function cf_rest_require_auth(): true|WP_Error {
+function clientflow_rest_require_auth(): true|WP_Error {
 	if ( ! is_user_logged_in() ) {
 		return new WP_Error(
 			'rest_not_logged_in',
@@ -136,7 +137,7 @@ function cf_rest_require_auth(): true|WP_Error {
  *
  * @return bool
  */
-function cf_rest_is_valid_feature( string $feature ): bool {
+function clientflow_rest_is_valid_feature( string $feature ): bool {
 	static $known = [
 		'create_proposal',
 		'use_ai',
@@ -165,7 +166,7 @@ function cf_rest_is_valid_feature( string $feature ): bool {
  *
  * @return WP_REST_Response
  */
-function cf_rest_get_user_plan( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_rest_get_user_plan( WP_REST_Request $request ): WP_REST_Response {
 	$user_id = get_current_user_id();
 	$plan    = ClientFlow_Entitlements::get_user_plan( $user_id );
 
@@ -204,7 +205,7 @@ function cf_rest_get_user_plan( WP_REST_Request $request ): WP_REST_Response {
  *
  * @return WP_REST_Response
  */
-function cf_rest_check_feature( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_rest_check_feature( WP_REST_Request $request ): WP_REST_Response {
 	$user_id = get_current_user_id();
 	$feature = (string) $request->get_param( 'feature' );
 	$options = (array)  ( $request->get_param( 'options' ) ?? [] );
@@ -232,7 +233,7 @@ function cf_rest_check_feature( WP_REST_Request $request ): WP_REST_Response {
  *
  * @return WP_REST_Response
  */
-function cf_rest_get_usage( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_rest_get_usage( WP_REST_Request $request ): WP_REST_Response {
 	$user_id = get_current_user_id();
 
 	return new WP_REST_Response(
@@ -280,7 +281,7 @@ function cf_rest_get_usage( WP_REST_Request $request ): WP_REST_Response {
  *
  * @return WP_REST_Response|WP_Error
  */
-function cf_rest_log_usage( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_log_usage( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$user_id = get_current_user_id();
 	$feature = (string) $request->get_param( 'feature' );
 	$meta    = (array)  ( $request->get_param( 'meta' ) ?? [] );
@@ -330,7 +331,7 @@ function cf_rest_log_usage( WP_REST_Request $request ): WP_REST_Response|WP_Erro
  *
  * @return WP_REST_Response
  */
-function cf_rest_usage_report( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_rest_usage_report( WP_REST_Request $request ): WP_REST_Response {
 	global $wpdb;
 
 	$month = (string) $request->get_param( 'month' );

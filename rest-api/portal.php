@@ -15,17 +15,19 @@
 
 declare( strict_types = 1 );
 
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- All table variables use $wpdb->prefix with hardcoded slugs, not user input.
+
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-add_action( 'rest_api_init', 'cf_register_portal_routes' );
+add_action( 'rest_api_init', 'clientflow_register_portal_routes' );
 
-function cf_register_portal_routes(): void {
+function clientflow_register_portal_routes(): void {
 	$ns = 'clientflow/v1';
 
 	// ── Public: request a magic link ─────────────────────────────────────────
 	register_rest_route( $ns, '/portal/send-magic-link', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_portal_send_magic_link',
+		'callback'            => 'clientflow_portal_send_magic_link',
 		'permission_callback' => '__return_true',
 		'args'                => [
 			'email' => [
@@ -39,7 +41,7 @@ function cf_register_portal_routes(): void {
 	// ── Public: verify token & set auth cookie ───────────────────────────────
 	register_rest_route( $ns, '/portal/verify', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_portal_verify',
+		'callback'            => 'clientflow_portal_verify',
 		'permission_callback' => '__return_true',
 		'args'                => [
 			'token' => [
@@ -52,35 +54,35 @@ function cf_register_portal_routes(): void {
 	// ── Authenticated: current client profile ────────────────────────────────
 	register_rest_route( $ns, '/portal/me', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_portal_me',
+		'callback'            => 'clientflow_portal_me',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 	] );
 
 	// ── Authenticated: client's proposals ───────────────────────────────────
 	register_rest_route( $ns, '/portal/proposals', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_portal_proposals',
+		'callback'            => 'clientflow_portal_proposals',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 	] );
 
 	// ── Authenticated: client's payments ────────────────────────────────────
 	register_rest_route( $ns, '/portal/payments', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_portal_payments',
+		'callback'            => 'clientflow_portal_payments',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 	] );
 
 	// ── Authenticated: logout ────────────────────────────────────────────────
 	register_rest_route( $ns, '/portal/logout', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_portal_logout',
+		'callback'            => 'clientflow_portal_logout',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 	] );
 
 	// ── Authenticated: set password (first-time forced setup) ────────────────
 	register_rest_route( $ns, '/portal/set-password', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_portal_set_password',
+		'callback'            => 'clientflow_portal_set_password',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 		'args'                => [
 			'password' => [
@@ -93,7 +95,7 @@ function cf_register_portal_routes(): void {
 	// ── Authenticated: single payment receipt ───────────────────────────────
 	register_rest_route( $ns, '/portal/receipt/(?P<id>\d+)', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_portal_get_receipt',
+		'callback'            => 'clientflow_portal_get_receipt',
 		'permission_callback' => [ 'ClientFlow_Portal_Auth', 'rest_permission' ],
 		'args'                => [
 			'id' => [ 'type' => 'integer', 'required' => true ],
@@ -103,7 +105,7 @@ function cf_register_portal_routes(): void {
 	// ── Public: password login ───────────────────────────────────────────────
 	register_rest_route( $ns, '/portal/login', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_portal_password_login',
+		'callback'            => 'clientflow_portal_password_login',
 		'permission_callback' => '__return_true',
 		'args'                => [
 			'email'    => [
@@ -129,7 +131,7 @@ function cf_register_portal_routes(): void {
  * Accepts: { email }
  * Always returns a generic success response to prevent email enumeration.
  */
-function cf_portal_send_magic_link( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_portal_send_magic_link( WP_REST_Request $request ): WP_REST_Response {
 	$email = $request->get_param( 'email' );
 
 	// We get-or-create silently; if the email isn't associated with any
@@ -153,7 +155,7 @@ function cf_portal_send_magic_link( WP_REST_Request $request ): WP_REST_Response
  * Accepts: { token }
  * On success: sets WP auth cookie + returns redirect URL.
  */
-function cf_portal_verify( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_portal_verify( WP_REST_Request $request ): WP_REST_Response {
 	$token = $request->get_param( 'token' );
 
 	$result = ClientFlow_Portal_Auth::verify_magic_token( $token );
@@ -180,7 +182,7 @@ function cf_portal_verify( WP_REST_Request $request ): WP_REST_Response {
 /**
  * GET /portal/me
  */
-function cf_portal_me(): WP_REST_Response {
+function clientflow_portal_me(): WP_REST_Response {
 	$client = ClientFlow_Portal_Data::get_client( get_current_user_id() );
 
 	return new WP_REST_Response( $client, 200 );
@@ -189,7 +191,7 @@ function cf_portal_me(): WP_REST_Response {
 /**
  * GET /portal/proposals
  */
-function cf_portal_proposals(): WP_REST_Response {
+function clientflow_portal_proposals(): WP_REST_Response {
 	$proposals = ClientFlow_Portal_Data::get_proposals( get_current_user_id() );
 
 	return new WP_REST_Response( $proposals, 200 );
@@ -198,7 +200,7 @@ function cf_portal_proposals(): WP_REST_Response {
 /**
  * GET /portal/payments
  */
-function cf_portal_payments(): WP_REST_Response {
+function clientflow_portal_payments(): WP_REST_Response {
 	$payments = ClientFlow_Portal_Data::get_payments( get_current_user_id() );
 
 	// For any payment that is still pending, check Stripe directly and write-through
@@ -209,7 +211,7 @@ function cf_portal_payments(): WP_REST_Response {
 			if ( in_array( $pm['status'], [ 'pending', 'processing' ], true ) && ! empty( $pm['stripe_session_id'] ) ) {
 				$stripe_session = ClientFlow_Stripe::retrieve_session( $pm['stripe_session_id'] );
 				if ( ! is_wp_error( $stripe_session ) && 'paid' === ( $stripe_session['payment_status'] ?? '' ) ) {
-					cf_handle_checkout_complete( $stripe_session );
+					clientflow_handle_checkout_complete( $stripe_session );
 					$resolved = true;
 				}
 			}
@@ -226,7 +228,7 @@ function cf_portal_payments(): WP_REST_Response {
 /**
  * POST /portal/logout
  */
-function cf_portal_logout(): WP_REST_Response {
+function clientflow_portal_logout(): WP_REST_Response {
 	wp_logout();
 
 	return new WP_REST_Response( [
@@ -239,7 +241,7 @@ function cf_portal_logout(): WP_REST_Response {
  * Validate a portal password against all requirements.
  * Returns an array of failed rule keys (empty = valid).
  */
-function cf_validate_portal_password( string $password ): array {
+function clientflow_validate_portal_password( string $password ): array {
 	$errors = [];
 	if ( strlen( $password ) < 8 )                     $errors[] = 'min_length';
 	if ( ! preg_match( '/[A-Z]/', $password ) )        $errors[] = 'uppercase';
@@ -252,7 +254,7 @@ function cf_validate_portal_password( string $password ): array {
 /**
  * POST /portal/set-password
  */
-function cf_portal_set_password( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_portal_set_password( WP_REST_Request $request ): WP_REST_Response {
 	$user_id  = get_current_user_id();
 	$password = $request->get_param( 'password' );
 
@@ -269,7 +271,7 @@ function cf_portal_set_password( WP_REST_Request $request ): WP_REST_Response {
 		}
 	}
 
-	$errors = cf_validate_portal_password( $password );
+	$errors = clientflow_validate_portal_password( $password );
 
 	if ( $errors ) {
 		return new WP_REST_Response( [
@@ -293,7 +295,7 @@ function cf_portal_set_password( WP_REST_Request $request ): WP_REST_Response {
 /**
  * POST /portal/login
  */
-function cf_portal_password_login( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_portal_password_login( WP_REST_Request $request ): WP_REST_Response {
 	$email    = $request->get_param( 'email' );
 	$password = $request->get_param( 'password' );
 	$user     = get_user_by( 'email', $email );
@@ -333,7 +335,7 @@ function cf_portal_password_login( WP_REST_Request $request ): WP_REST_Response 
  * Scoped to the authenticated client — returns 404 if the payment
  * doesn't belong to them.
  */
-function cf_portal_get_receipt( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_portal_get_receipt( WP_REST_Request $request ): WP_REST_Response {
 	global $wpdb;
 
 	$payment_id = (int) $request->get_param( 'id' );

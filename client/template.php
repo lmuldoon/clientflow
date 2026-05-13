@@ -7,7 +7,7 @@
  * document viewer page.
  *
  * Variables injected by client-routing.php:
- *   $cf_proposal_token  string  Sanitised UUID token from the URL.
+ *   $clientflow_proposal_token  string  Sanitised UUID token from the URL.
  *
  * @package ClientFlow
  * @since   0.1.0
@@ -17,13 +17,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Determine whether this is a preview or a standard proposal URL.
-$cf_preview_token  = $cf_preview_token  ?? '';
-$cf_proposal_token = $cf_proposal_token ?? '';
-$is_preview        = '' !== $cf_preview_token;
-$active_token      = $is_preview ? $cf_preview_token : $cf_proposal_token;
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- All file-scope variables in this template use the clientflow_ prefix.
 
-if ( empty( $active_token ) ) {
+// Determine whether this is a preview or a standard proposal URL.
+$clientflow_preview_token  = $clientflow_preview_token  ?? '';
+$clientflow_proposal_token = $clientflow_proposal_token ?? '';
+$clientflow_is_preview        = '' !== $clientflow_preview_token;
+$clientflow_active_token      = $clientflow_is_preview ? $clientflow_preview_token : $clientflow_proposal_token;
+
+if ( empty( $clientflow_active_token ) ) {
 	wp_die(
 		esc_html__( 'Invalid proposal link.', 'clientflow' ),
 		esc_html__( 'Not Found', 'clientflow' ),
@@ -32,36 +34,36 @@ if ( empty( $active_token ) ) {
 }
 
 // Payment result only applies on live proposal URLs.
-$cf_payment_result = $is_preview ? '' : ( $cf_payment_result ?? '' );
-$cf_session_id     = $is_preview ? '' : ( $cf_session_id     ?? '' );
+$clientflow_payment_result = $clientflow_is_preview ? '' : ( $clientflow_payment_result ?? '' );
+$clientflow_session_id     = $clientflow_is_preview ? '' : ( $clientflow_session_id     ?? '' );
 
 // ── Client email (for success page personalisation) ───────────────────────────
-$client_email = '';
-if ( ! $is_preview && ! empty( $cf_payment_result ) && class_exists( 'ClientFlow_Proposal_Client' ) ) {
-	$_proposal_row = ClientFlow_Proposal_Client::get_by_token( $cf_proposal_token );
+$clientflow_client_email = '';
+if ( ! $clientflow_is_preview && ! empty( $clientflow_payment_result ) && class_exists( 'ClientFlow_Proposal_Client' ) ) {
+	$_proposal_row = ClientFlow_Proposal_Client::get_by_token( $clientflow_proposal_token );
 	if ( ! is_wp_error( $_proposal_row ) ) {
-		$client_email = $_proposal_row['client_email'] ?? '';
+		$clientflow_client_email = $_proposal_row['client_email'] ?? '';
 	}
 }
 
 // ── Business branding ─────────────────────────────────────────────────────────
-$business_name = get_bloginfo( 'name' );
-$business_logo = esc_url( get_option( 'clientflow_logo_url', '' ) );
-$brand_color   = sanitize_hex_color( get_option( 'clientflow_brand_color', '#6366F1' ) ) ?: '#6366F1';
+$clientflow_business_name = get_bloginfo( 'name' );
+$clientflow_business_logo = esc_url( get_option( 'clientflow_logo_url', '' ) );
+$clientflow_brand_color   = sanitize_hex_color( get_option( 'clientflow_brand_color', '#6366F1' ) ) ?: '#6366F1';
 
 // ── Asset URLs ────────────────────────────────────────────────────────────────
-$build_dir     = CLIENTFLOW_DIR . 'build/';
-$build_url     = CLIENTFLOW_URL . 'build/';
-$asset_file    = $build_dir . 'client.asset.php';
-$asset         = file_exists( $asset_file ) ? require $asset_file : [ 'version' => CLIENTFLOW_VERSION ];
-$script_ver    = $asset['version'] ?? CLIENTFLOW_VERSION;
+$clientflow_build_dir     = CLIENTFLOW_DIR . 'build/';
+$clientflow_build_url     = CLIENTFLOW_URL . 'build/';
+$clientflow_asset_file    = $clientflow_build_dir . 'client.asset.php';
+$clientflow_asset         = file_exists( $clientflow_asset_file ) ? require $clientflow_asset_file : [ 'version' => CLIENTFLOW_VERSION ];
+$clientflow_script_ver    = $clientflow_asset['version'] ?? CLIENTFLOW_VERSION;
 
-$script_url    = $build_url . 'client.js';
-$style_url     = $build_url . 'client.css';
-$has_css       = file_exists( $build_dir . 'client.css' );
+$clientflow_script_url    = $clientflow_build_url . 'client.js';
+$clientflow_style_url     = $clientflow_build_url . 'client.css';
+$clientflow_has_css       = file_exists( $clientflow_build_dir . 'client.css' );
 
 // The client bundle must exist.
-if ( ! file_exists( $build_dir . 'client.js' ) ) {
+if ( ! file_exists( $clientflow_build_dir . 'client.js' ) ) {
 	wp_die(
 		esc_html__( 'Proposal viewer assets not built. Please contact the site administrator.', 'clientflow' ),
 		esc_html__( 'Configuration Error', 'clientflow' ),
@@ -70,7 +72,7 @@ if ( ! file_exists( $build_dir . 'client.js' ) ) {
 }
 
 // ── Favicon ───────────────────────────────────────────────────────────────────
-$favicon_url = get_site_icon_url( 32 );
+$clientflow_favicon_url = get_site_icon_url( 32 );
 ?>
 <!DOCTYPE html>
 <html lang="<?php echo esc_attr( get_bloginfo( 'language' ) ); ?>">
@@ -79,14 +81,15 @@ $favicon_url = get_site_icon_url( 32 );
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="robots" content="noindex, nofollow">
 
-	<title><?php echo esc_html( $business_name ); ?> &mdash; <?php esc_html_e( 'Proposal', 'clientflow' ); ?></title>
+	<title><?php echo esc_html( $clientflow_business_name ); ?> &mdash; <?php esc_html_e( 'Proposal', 'clientflow' ); ?></title>
 
-	<?php if ( $favicon_url ) : ?>
-		<link rel="icon" href="<?php echo esc_url( $favicon_url ); ?>">
+	<?php if ( $clientflow_favicon_url ) : ?>
+		<link rel="icon" href="<?php echo esc_url( $clientflow_favicon_url ); ?>">
 	<?php endif; ?>
 
-	<?php if ( $has_css ) : ?>
-		<link rel="stylesheet" href="<?php echo esc_url( $style_url ); ?>?v=<?php echo esc_attr( $script_ver ); ?>">
+	<?php if ( $clientflow_has_css ) : ?>
+		<?php // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet -- standalone template, wp_enqueue_style() cannot be used outside WP head. ?>
+		<link rel="stylesheet" href="<?php echo esc_url( $clientflow_style_url ); ?>?v=<?php echo esc_attr( $clientflow_script_ver ); ?>">
 	<?php endif; ?>
 
 	<!-- Minimal body reset to avoid flash of unstyled content before React mounts -->
@@ -142,31 +145,32 @@ $favicon_url = get_site_icon_url( 32 );
 	 * older builds may instead need 'react' + 'wp-element'. The asset file
 	 * is the authoritative source of what this bundle needs.
 	 */
-	$script_deps = $asset['dependencies'] ?? [];
+	$clientflow_script_deps = $clientflow_asset['dependencies'] ?? [];
 	// Always ensure wp-element is available (provides wp.element.render).
-	if ( ! in_array( 'wp-element', $script_deps, true ) ) {
-		$script_deps[] = 'wp-element';
+	if ( ! in_array( 'wp-element', $clientflow_script_deps, true ) ) {
+		$clientflow_script_deps[] = 'wp-element';
 	}
-	wp_print_scripts( $script_deps );
+	wp_print_scripts( $clientflow_script_deps );
 	?>
 
 	<script>
 		window.cfClientData = {
 			apiUrl:          <?php echo wp_json_encode( rest_url( 'clientflow/v1/' ) ); ?>,
-			token:           <?php echo wp_json_encode( $active_token ); ?>,
-			businessName:    <?php echo wp_json_encode( $business_name ); ?>,
-			businessLogo:    <?php echo wp_json_encode( $business_logo ); ?>,
-			brandColor:      <?php echo wp_json_encode( $brand_color ); ?>,
+			token:           <?php echo wp_json_encode( $clientflow_active_token ); ?>,
+			businessName:    <?php echo wp_json_encode( $clientflow_business_name ); ?>,
+			businessLogo:    <?php echo wp_json_encode( $clientflow_business_logo ); ?>,
+			brandColor:      <?php echo wp_json_encode( $clientflow_brand_color ); ?>,
 			nonce:           <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?>,
-			pageType:        <?php echo wp_json_encode( $is_preview ? 'preview' : ( $cf_payment_result ?: 'proposal' ) ); ?>,
-			sessionId:       <?php echo wp_json_encode( $cf_session_id ); ?>,
-			clientEmail:     <?php echo wp_json_encode( $client_email ); ?>,
+			pageType:        <?php echo wp_json_encode( $clientflow_is_preview ? 'preview' : ( $clientflow_payment_result ?: 'proposal' ) ); ?>,
+			sessionId:       <?php echo wp_json_encode( $clientflow_session_id ); ?>,
+			clientEmail:     <?php echo wp_json_encode( $clientflow_client_email ); ?>,
 			isPortalClient:  <?php echo wp_json_encode( class_exists( 'ClientFlow_Portal_Auth' ) && ClientFlow_Portal_Auth::is_authenticated() ); ?>,
 			pluginLogoUrl:   <?php echo wp_json_encode( esc_url( CLIENTFLOW_URL . 'assets/images/logo.svg' ) ); ?>
 		};
 	</script>
 
-	<script src="<?php echo esc_url( $script_url ); ?>?v=<?php echo esc_attr( $script_ver ); ?>" defer></script>
+	<?php // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- standalone template, wp_enqueue_script() cannot be used outside WP head. ?>
+	<script src="<?php echo esc_url( $clientflow_script_url ); ?>?v=<?php echo esc_attr( $clientflow_script_ver ); ?>" defer></script>
 
 </body>
 </html>

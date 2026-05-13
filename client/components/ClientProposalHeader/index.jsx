@@ -91,7 +91,7 @@ const CSS = `
 .cfh-logo {
 	height: 48px;
 	width: auto;
-	max-width: 200px;
+	max-width: 180px;
 	object-fit: contain;
 	border-radius: 4px;
 	display: block;

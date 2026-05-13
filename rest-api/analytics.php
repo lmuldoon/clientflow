@@ -3,7 +3,7 @@
  * Analytics REST endpoint
  *
  * GET /wp-json/clientflow/v1/analytics/overview
- *   — Requires admin auth (cf_rest_require_auth)
+ *   — Requires admin auth (clientflow_rest_require_auth)
  *   — Pro/Agency only (free users receive 403 upgrade_required)
  *   — Accepts: range (week|month|year|custom), from, to, export (csv)
  *   — Returns: { kpis, chart, performance, feed }
@@ -13,6 +13,7 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -27,8 +28,8 @@ add_action( 'rest_api_init', static function (): void {
 		'/analytics/overview',
 		[
 			'methods'             => 'GET',
-			'callback'            => 'cf_rest_analytics_overview',
-			'permission_callback' => 'cf_rest_require_auth',
+			'callback'            => 'clientflow_rest_analytics_overview',
+			'permission_callback' => 'clientflow_rest_require_auth',
 			'args'                => [
 				'range'  => [
 					'required'          => false,
@@ -57,7 +58,7 @@ add_action( 'rest_api_init', static function (): void {
 	);
 } );
 
-function cf_rest_analytics_overview( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_rest_analytics_overview( WP_REST_Request $request ): WP_REST_Response {
 	$user_id = get_current_user_id();
 
 	// Plan gate — free users get an upgrade prompt.
@@ -73,7 +74,7 @@ function cf_rest_analytics_overview( WP_REST_Request $request ): WP_REST_Respons
 	}
 
 	// Resolve date range.
-	[ $from, $to ] = cf_analytics_resolve_range(
+	[ $from, $to ] = clientflow_analytics_resolve_range(
 		$request->get_param( 'range' ),
 		$request->get_param( 'from' ),
 		$request->get_param( 'to' )
@@ -89,7 +90,7 @@ function cf_rest_analytics_overview( WP_REST_Request $request ): WP_REST_Respons
 	}
 
 	// Determine chart granularity from range width.
-	$granularity = cf_analytics_granularity( $request->get_param( 'range' ) );
+	$granularity = clientflow_analytics_granularity( $request->get_param( 'range' ) );
 
 	return new WP_REST_Response(
 		[
@@ -108,7 +109,7 @@ function cf_rest_analytics_overview( WP_REST_Request $request ): WP_REST_Respons
  *
  * @return array{0: string, 1: string}|array{0: WP_Error}
  */
-function cf_analytics_resolve_range( string $range, ?string $from, ?string $to ): array {
+function clientflow_analytics_resolve_range( string $range, ?string $from, ?string $to ): array {
 	$now = new DateTime( 'now', new DateTimeZone( 'UTC' ) );
 
 	switch ( $range ) {
@@ -150,7 +151,7 @@ function cf_analytics_resolve_range( string $range, ?string $from, ?string $to )
 	}
 }
 
-function cf_analytics_granularity( string $range ): string {
+function clientflow_analytics_granularity( string $range ): string {
 	return match ( $range ) {
 		'year'  => 'month',
 		'week'  => 'day',

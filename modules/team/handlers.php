@@ -3,15 +3,16 @@
  * Team Business Logic Handlers
  *
  * Business logic for the Agency-tier team seats feature:
- *   - cf_team_get_members()    — list all team members for an owner
- *   - cf_team_invite_member()  — invite a new team member (creates WP user if needed)
- *   - cf_team_remove_member()  — remove a team member and decrement seat counter
+ *   - clientflow_team_get_members()    — list all team members for an owner
+ *   - clientflow_team_invite_member()  — invite a new team member (creates WP user if needed)
+ *   - clientflow_team_remove_member()  — remove a team member and decrement seat counter
  *
  * @package ClientFlow\Team
  * @since   0.1.0
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -23,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param int $owner_id
  * @return array<array{id: int, member_user_id: int, display_name: string, email: string, role: string, invited_at: string, accepted_at: string|null}>
  */
-function cf_team_get_members( int $owner_id ): array {
+function clientflow_team_get_members( int $owner_id ): array {
 	global $wpdb;
 
 	$rows = $wpdb->get_results(
@@ -54,7 +55,7 @@ function cf_team_get_members( int $owner_id ): array {
  * @param string $role  'admin'|'editor'|'viewer'
  * @return array{success: bool, error?: string}
  */
-function cf_team_invite_member( int $owner_id, string $email, string $name, string $role ): array {
+function clientflow_team_invite_member( int $owner_id, string $email, string $name, string $role ): array {
 	global $wpdb;
 
 	$email = sanitize_email( $email );
@@ -157,7 +158,7 @@ function cf_team_invite_member( int $owner_id, string $email, string $name, stri
 	$wpdb->query( 'COMMIT' );
 
 	// Send invite email.
-	cf_team_send_invite_email( $member_user_id, $owner_id, $is_new_user );
+	clientflow_team_send_invite_email( $member_user_id, $owner_id, $is_new_user );
 
 	return [ 'success' => true ];
 }
@@ -169,7 +170,7 @@ function cf_team_invite_member( int $owner_id, string $email, string $name, stri
  * @param int $row_id  Primary key of the clientflow_team_members row.
  * @return bool
  */
-function cf_team_remove_member( int $owner_id, int $row_id ): bool {
+function clientflow_team_remove_member( int $owner_id, int $row_id ): bool {
 	global $wpdb;
 
 	$deleted = $wpdb->delete(
@@ -203,7 +204,7 @@ function cf_team_remove_member( int $owner_id, int $row_id ): bool {
  * @param int  $owner_id
  * @param bool $is_new_user
  */
-function cf_team_send_invite_email( int $member_user_id, int $owner_id, bool $is_new_user ): void {
+function clientflow_team_send_invite_email( int $member_user_id, int $owner_id, bool $is_new_user ): void {
 	$member = get_user_by( 'ID', $member_user_id );
 	if ( ! $member ) {
 		return;
@@ -220,7 +221,7 @@ function cf_team_send_invite_email( int $member_user_id, int $owner_id, bool $is
 			: network_site_url( "wp-login.php?action=rp&key={$reset_key}&login=" . rawurlencode( $member->user_login ) );
 
 		$subject = "You've been invited to join {$business_name}";
-		$body    = cf_email_html( [
+		$body    = clientflow_email_html( [
 			'subject'       => $subject,
 			'business_name' => $business_name,
 			'name'          => $member->display_name,
@@ -230,7 +231,7 @@ function cf_team_send_invite_email( int $member_user_id, int $owner_id, bool $is
 		] );
 	} else {
 		$subject = "You've been added to {$business_name} on {$site_name}";
-		$body    = cf_email_html( [
+		$body    = clientflow_email_html( [
 			'subject'       => $subject,
 			'business_name' => $business_name,
 			'name'          => $member->display_name,

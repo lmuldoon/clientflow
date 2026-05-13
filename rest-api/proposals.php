@@ -21,6 +21,7 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -51,23 +52,23 @@ add_action( 'rest_api_init', static function (): void {
 	// ── GET /proposals/templates ──────────────────────────────────────────────
 	register_rest_route( $ns, '/proposals/templates', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_list_templates',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_list_templates',
+		'permission_callback' => 'clientflow_rest_require_auth',
 	] );
 
 	// ── POST /proposals/create ────────────────────────────────────────────────
 	register_rest_route( $ns, '/proposals/create', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_create_proposal',
-		'permission_callback' => 'cf_rest_require_auth',
-		'args'                => cf_proposal_create_args(),
+		'callback'            => 'clientflow_rest_create_proposal',
+		'permission_callback' => 'clientflow_rest_require_auth',
+		'args'                => clientflow_proposal_create_args(),
 	] );
 
 	// ── GET /proposals ────────────────────────────────────────────────────────
 	register_rest_route( $ns, '/proposals', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_list_proposals',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_list_proposals',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'status'   => [
 				'type'              => 'string',
@@ -86,27 +87,27 @@ add_action( 'rest_api_init', static function (): void {
 	// ── GET /proposals/{id} ───────────────────────────────────────────────────
 	register_rest_route( $ns, '/proposals/(?P<id>\d+)', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_get_proposal',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_get_proposal',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 
 	// ── POST /proposals/{id}/update ───────────────────────────────────────────
 	register_rest_route( $ns, '/proposals/(?P<id>\d+)/update', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_update_proposal',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_update_proposal',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => array_merge(
 			[ 'id' => [ 'type' => 'integer', 'required' => true ] ],
-			cf_proposal_update_args()
+			clientflow_proposal_update_args()
 		),
 	] );
 
 	// ── POST /proposals/{id}/send ─────────────────────────────────────────────
 	register_rest_route( $ns, '/proposals/(?P<id>\d+)/send', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_send_proposal',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_send_proposal',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id'            => [ 'type' => 'integer', 'required' => true ],
 			'client_email'  => [
@@ -126,43 +127,43 @@ add_action( 'rest_api_init', static function (): void {
 	// ── POST /proposals/{id}/update-wizard ───────────────────────────────────
 	register_rest_route( $ns, '/proposals/(?P<id>\d+)/update-wizard', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_update_wizard_proposal',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_update_wizard_proposal',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => array_merge(
 			[ 'id' => [ 'type' => 'integer', 'required' => true ] ],
-			cf_proposal_create_args()
+			clientflow_proposal_create_args()
 		),
 	] );
 
 	// ── POST /proposals/{id}/duplicate ────────────────────────────────────────
 	register_rest_route( $ns, '/proposals/(?P<id>\d+)/duplicate', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_duplicate_proposal',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_duplicate_proposal',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 
 	// ── DELETE /proposals/{id} ────────────────────────────────────────────────
 	register_rest_route( $ns, '/proposals/(?P<id>\d+)', [
 		'methods'             => WP_REST_Server::DELETABLE,
-		'callback'            => 'cf_rest_delete_proposal',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_delete_proposal',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 
 	// ── POST /proposals/{id}/preview-token ───────────────────────────────────
 	register_rest_route( $ns, '/proposals/(?P<id>\d+)/preview-token', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_generate_preview_token',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_generate_preview_token',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 
 	// ── DELETE /proposals/{id}/preview-token ─────────────────────────────────
 	register_rest_route( $ns, '/proposals/(?P<id>\d+)/preview-token', [
 		'methods'             => WP_REST_Server::DELETABLE,
-		'callback'            => 'cf_rest_revoke_preview_token',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_revoke_preview_token',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 } );
@@ -174,7 +175,7 @@ add_action( 'rest_api_init', static function (): void {
 /**
  * Args for POST /proposals/create.
  */
-function cf_proposal_create_args(): array {
+function clientflow_proposal_create_args(): array {
 	return [
 		'template_id'     => [ 'type' => 'string',  'required' => true,  'sanitize_callback' => 'sanitize_key' ],
 		'title'           => [ 'type' => 'string',  'required' => true,  'sanitize_callback' => 'sanitize_text_field' ],
@@ -195,7 +196,7 @@ function cf_proposal_create_args(): array {
 /**
  * Args for POST /proposals/{id}/update.
  */
-function cf_proposal_update_args(): array {
+function clientflow_proposal_update_args(): array {
 	return [
 		'title'        => [ 'type' => 'string', 'required' => false, 'sanitize_callback' => 'sanitize_text_field' ],
 		'content'      => [ 'type' => 'string', 'required' => false, 'sanitize_callback' => 'wp_kses_post' ],
@@ -216,8 +217,8 @@ function cf_proposal_update_args(): array {
  *
  * Returns templates available for the current user's plan.
  */
-function cf_rest_list_templates( WP_REST_Request $request ): WP_REST_Response {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_list_templates( WP_REST_Request $request ): WP_REST_Response {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$plan     = ClientFlow_Entitlements::get_user_plan( $user_id );
 	$all      = ClientFlow_Proposal_Template::all();
 
@@ -236,8 +237,8 @@ function cf_rest_list_templates( WP_REST_Request $request ): WP_REST_Response {
  *
  * Create a proposal from the wizard payload.
  */
-function cf_rest_create_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_create_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$payload = $request->get_params();
 
 	$result = ClientFlow_Proposal_Handlers::create_from_wizard( $user_id, $payload );
@@ -254,8 +255,8 @@ function cf_rest_create_proposal( WP_REST_Request $request ): WP_REST_Response|W
  *
  * List the current user's proposals.
  */
-function cf_rest_list_proposals( WP_REST_Request $request ): WP_REST_Response {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_list_proposals( WP_REST_Request $request ): WP_REST_Response {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 
 	$result = ClientFlow_Proposal::list( $user_id, [
 		'status'   => $request->get_param( 'status' ),
@@ -274,8 +275,8 @@ function cf_rest_list_proposals( WP_REST_Request $request ): WP_REST_Response {
  *
  * Get a single proposal.
  */
-function cf_rest_get_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_get_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 
 	$result = ClientFlow_Proposal::get( $id, $user_id );
@@ -292,8 +293,8 @@ function cf_rest_get_proposal( WP_REST_Request $request ): WP_REST_Response|WP_E
  *
  * Update an existing proposal.
  */
-function cf_rest_update_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_update_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 
 	$data = array_filter(
@@ -339,7 +340,7 @@ function cf_rest_update_proposal( WP_REST_Request $request ): WP_REST_Response|W
 		}
 
 		// Proposals with a linked project must be completed through the project, not directly.
-		if ( 'completed' === $data['status'] && cf_can_user( $user_id, 'use_projects' ) ) {
+		if ( 'completed' === $data['status'] && clientflow_can_user( $user_id, 'use_projects' ) ) {
 			$has_project = (bool) $wpdb->get_var(
 				$wpdb->prepare(
 					"SELECT id FROM {$wpdb->prefix}clientflow_projects WHERE proposal_id = %d LIMIT 1",
@@ -378,8 +379,8 @@ function cf_rest_update_proposal( WP_REST_Request $request ): WP_REST_Response|W
 				$id
 			)
 		);
-		if ( ! $has_project && function_exists( 'cf_maybe_send_testimonial_email' ) ) {
-			cf_maybe_send_testimonial_email( [ 'proposal_id' => $id ], $user_id );
+		if ( ! $has_project && function_exists( 'clientflow_maybe_send_testimonial_email' ) ) {
+			clientflow_maybe_send_testimonial_email( [ 'proposal_id' => $id ], $user_id );
 		}
 	}
 
@@ -391,10 +392,10 @@ function cf_rest_update_proposal( WP_REST_Request $request ): WP_REST_Response|W
  *
  * Mark a proposal as sent and email the client.
  */
-function cf_rest_send_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_send_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 
-	if ( ! cf_rest_rate_limit( 'send_proposal', $user_id, 20 ) ) {
+	if ( ! clientflow_rest_rate_limit( 'send_proposal', $user_id, 20 ) ) {
 		return new WP_Error( 'rate_limited', __( 'Too many requests. Please wait a moment.', 'clientflow' ), [ 'status' => 429 ] );
 	}
 
@@ -416,8 +417,8 @@ function cf_rest_send_proposal( WP_REST_Request $request ): WP_REST_Response|WP_
  *
  * Update an existing proposal using the full wizard payload.
  */
-function cf_rest_update_wizard_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_update_wizard_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 	$payload = $request->get_params();
 
@@ -435,8 +436,8 @@ function cf_rest_update_wizard_proposal( WP_REST_Request $request ): WP_REST_Res
  *
  * Duplicate a proposal.
  */
-function cf_rest_duplicate_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_duplicate_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 
 	$new_id = ClientFlow_Proposal::duplicate( $id, $user_id );
@@ -459,8 +460,8 @@ function cf_rest_duplicate_proposal( WP_REST_Request $request ): WP_REST_Respons
  *
  * Delete a proposal.
  */
-function cf_rest_delete_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_delete_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 
 	$result = ClientFlow_Proposal::delete( $id, $user_id );
@@ -478,8 +479,8 @@ function cf_rest_delete_proposal( WP_REST_Request $request ): WP_REST_Response|W
  * Generate (or regenerate) a shareable preview link for a proposal.
  * The preview URL is read-only — no client actions are available on it.
  */
-function cf_rest_generate_preview_token( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_generate_preview_token( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 
 	$token = ClientFlow_Proposal::generate_preview_token( $id, $user_id );
@@ -498,8 +499,8 @@ function cf_rest_generate_preview_token( WP_REST_Request $request ): WP_REST_Res
  *
  * Revoke the preview token — the preview URL immediately becomes invalid.
  */
-function cf_rest_revoke_preview_token( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-	$user_id = cf_get_owner_id( get_current_user_id() );
+function clientflow_rest_revoke_preview_token( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$id      = (int) $request->get_param( 'id' );
 
 	$result = ClientFlow_Proposal::revoke_preview_token( $id, $user_id );

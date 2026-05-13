@@ -17,6 +17,7 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -560,7 +561,7 @@ class ClientFlow_Entitlements {
 	 * @return bool True if allowed; false if rate-limited.
 	 */
 	public static function check_rate_limit( int $user_id ): bool {
-		$key = "cf_rate_limit_{$user_id}";
+		$key = "clientflow_rate_limit_{$user_id}";
 
 		if ( get_transient( $key ) ) {
 			return false;
@@ -668,7 +669,7 @@ class ClientFlow_Entitlements {
 		wp_mail(
 			$user->user_email,
 			__( 'Your ClientFlow plan has changed', 'clientflow' ),
-			cf_email_html( [
+			clientflow_email_html( [
 				'name' => $user->display_name,
 				'body' => "<p style=\"margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;\">Your ClientFlow plan has been changed to <strong style=\"color:#1A1A2E;\">{$new_plan_label}</strong>. Some features may now be restricted.</p><p style=\"margin:0;font-size:16px;color:#6B7280;line-height:1.65;\">Your usage counters will reset at the start of next month. If you have any questions, please get in touch.</p>",
 				'cta_label' => __( 'View Account', 'clientflow' ),

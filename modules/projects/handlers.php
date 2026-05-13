@@ -12,6 +12,8 @@
 
 declare( strict_types=1 );
 
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use $wpdb->prefix with trusted constants, not user input.
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -24,8 +26,8 @@ class ClientFlow_Project_Handlers {
 	/**
 	 * Auto-create a project when a proposal is accepted.
 	 *
-	 * Called via the cf_proposal_accepted action hook.
-	 * Only runs for Agency plan users (cf_can_user check performed in the hook,
+	 * Called via the clientflow_proposal_accepted action hook.
+	 * Only runs for Agency plan users (clientflow_can_user check performed in the hook,
 	 * but an extra guard is kept here for direct calls).
 	 *
 	 * @param int $proposal_id
@@ -85,7 +87,7 @@ class ClientFlow_Project_Handlers {
 			return $project_id;
 		}
 
-		do_action( 'cf_project_created', $project_id, $owner_id );
+		do_action( 'clientflow_project_created', $project_id, $owner_id );
 
 		// Auto-create milestones from proposal line items.
 		$content_raw = $wpdb->get_var(

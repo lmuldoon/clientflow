@@ -17,6 +17,7 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -47,7 +48,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── POST /payments/create-session ─────────────────────────────────────────
 	register_rest_route( $ns, '/payments/create-session', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_payment_create_session',
+		'callback'            => 'clientflow_rest_payment_create_session',
 		'permission_callback' => '__return_true', // Token-based auth in handler.
 		'args'                => [
 			'token' => [
@@ -61,7 +62,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── GET /payments/status ──────────────────────────────────────────────────
 	register_rest_route( $ns, '/payments/status', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_payment_status',
+		'callback'            => 'clientflow_rest_payment_status',
 		'permission_callback' => '__return_true',
 		'args'                => [
 			'session_id' => [
@@ -81,7 +82,7 @@ add_action( 'rest_api_init', static function (): void {
 	// ── POST /payments/webhook ────────────────────────────────────────────────
 	register_rest_route( $ns, '/payments/webhook', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_payment_webhook',
+		'callback'            => 'clientflow_rest_payment_webhook',
 		'permission_callback' => '__return_true', // Stripe signature check inside.
 	] );
 } );
@@ -96,7 +97,7 @@ add_action( 'rest_api_init', static function (): void {
  * Creates a Stripe Checkout Session for a proposal and returns the URL to
  * redirect the client to Stripe's hosted payment page.
  */
-function cf_rest_payment_create_session( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_payment_create_session( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$token = (string) $request->get_param( 'token' );
 
 	// ── Validate token + get proposal ────────────────────────────────────────
@@ -257,7 +258,7 @@ function cf_rest_payment_create_session( WP_REST_Request $request ): WP_REST_Res
  * Returns the payment status. Called by the PaymentSuccess component to
  * confirm payment after Stripe's success redirect.
  */
-function cf_rest_payment_status( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_payment_status( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$session_id = (string) $request->get_param( 'session_id' );
 
 	// Helper: build the standard response array from a payment record.
@@ -287,9 +288,9 @@ function cf_rest_payment_status( WP_REST_Request $request ): WP_REST_Response|WP
 
 	if ( 'paid' === ( $stripe_session['payment_status'] ?? '' ) ) {
 		// Write-through: process fully as if the webhook had fired.
-		// cf_handle_checkout_complete is idempotent — mark_complete updates by
-		// session_id, and cf_proposal_accepted checks status before creating a project.
-		cf_handle_checkout_complete( $stripe_session );
+		// clientflow_handle_checkout_complete is idempotent — mark_complete updates by
+		// session_id, and clientflow_proposal_accepted checks status before creating a project.
+		clientflow_handle_checkout_complete( $stripe_session );
 
 		$payment = ClientFlow_Payment::get_by_session_id( $session_id );
 		if ( ! is_wp_error( $payment ) ) {
@@ -311,7 +312,7 @@ function cf_rest_payment_status( WP_REST_Request $request ): WP_REST_Response|WP
  * so we must read the raw body directly via php://input before WordPress
  * processes it — the REST API fires this after parsing, but we grab raw input.
  */
-function cf_rest_payment_webhook( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_payment_webhook( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	$payload    = $request->get_body();
 	$sig_header = $request->get_header( 'stripe-signature' );
 	$secret     = ClientFlow_Stripe::get_webhook_secret();
@@ -341,7 +342,7 @@ function cf_rest_payment_webhook( WP_REST_Request $request ): WP_REST_Response|W
 	// ── Route by event type ───────────────────────────────────────────────────
 	switch ( $event['type'] ) {
 		case 'checkout.session.completed':
-			cf_handle_checkout_complete( $event['data']['object'] ?? [] );
+			clientflow_handle_checkout_complete( $event['data']['object'] ?? [] );
 			break;
 
 		case 'checkout.session.expired':
@@ -366,7 +367,7 @@ function cf_rest_payment_webhook( WP_REST_Request $request ): WP_REST_Response|W
  *
  * @param array $session Stripe session object from event data.
  */
-function cf_handle_checkout_complete( array $session ): void {
+function clientflow_handle_checkout_complete( array $session ): void {
 	$session_id        = $session['id']              ?? '';
 	$payment_intent_id = $session['payment_intent']  ?? '';
 	$customer_id       = $session['customer']        ?? null;
@@ -403,7 +404,7 @@ function cf_handle_checkout_complete( array $session ): void {
 	}
 
 	// Transition to 'accepted' if still in an open state, and notify modules once.
-	// Firing cf_proposal_accepted on every payment would re-send the portal magic-link
+	// Firing clientflow_proposal_accepted on every payment would re-send the portal magic-link
 	// email on every milestone/installment — it must only fire on first acceptance.
 	if ( in_array( $proposal['status'], [ 'draft', 'sent', 'viewed' ], true ) ) {
 		$wpdb->update(
@@ -415,9 +416,9 @@ function cf_handle_checkout_complete( array $session ): void {
 			],
 			[ 'id' => $proposal_id ]
 		);
-		do_action( 'cf_proposal_accepted', $proposal_id, (int) $proposal['owner_id'] );
+		do_action( 'clientflow_proposal_accepted', $proposal_id, (int) $proposal['owner_id'] );
 	}
-	do_action( 'cf_payment_completed', ! is_wp_error( $payment ) ? (int) $payment['id'] : 0, (int) $proposal['owner_id'] );
+	do_action( 'clientflow_payment_completed', ! is_wp_error( $payment ) ? (int) $payment['id'] : 0, (int) $proposal['owner_id'] );
 
 	// If the proposal was already marked complete before this payment arrived,
 	// the testimonial check at completion time would have found no completed
@@ -432,9 +433,9 @@ function cf_handle_checkout_complete( array $session ): void {
 		),
 		ARRAY_A
 	);
-	if ( $completed_project && function_exists( 'cf_maybe_send_testimonial_email' ) ) {
-		cf_maybe_send_testimonial_email( $completed_project, (int) $proposal['owner_id'] );
-	} elseif ( ! $completed_project && function_exists( 'cf_maybe_send_testimonial_email' ) ) {
+	if ( $completed_project && function_exists( 'clientflow_maybe_send_testimonial_email' ) ) {
+		clientflow_maybe_send_testimonial_email( $completed_project, (int) $proposal['owner_id'] );
+	} elseif ( ! $completed_project && function_exists( 'clientflow_maybe_send_testimonial_email' ) ) {
 		$proposal_status = (string) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT status FROM {$wpdb->prefix}clientflow_proposals WHERE id = %d",
@@ -442,7 +443,7 @@ function cf_handle_checkout_complete( array $session ): void {
 			)
 		);
 		if ( 'completed' === $proposal_status ) {
-			cf_maybe_send_testimonial_email( [ 'proposal_id' => $proposal_id ], (int) $proposal['owner_id'] );
+			clientflow_maybe_send_testimonial_email( [ 'proposal_id' => $proposal_id ], (int) $proposal['owner_id'] );
 		}
 	}
 
@@ -465,7 +466,7 @@ function cf_handle_checkout_complete( array $session ): void {
 	);
 
 	// Email owner.
-	cf_notify_owner_payment_complete( (int) $proposal['owner_id'], $proposal, $session );
+	clientflow_notify_owner_payment_complete( (int) $proposal['owner_id'], $proposal, $session );
 }
 
 /**
@@ -475,7 +476,7 @@ function cf_handle_checkout_complete( array $session ): void {
  * @param array $proposal Raw proposal row.
  * @param array $session  Stripe session object.
  */
-function cf_notify_owner_payment_complete( int $owner_id, array $proposal, array $session ): void {
+function clientflow_notify_owner_payment_complete( int $owner_id, array $proposal, array $session ): void {
 	global $wpdb;
 
 	$owner = get_userdata( $owner_id );
@@ -489,11 +490,12 @@ function cf_notify_owner_payment_complete( int $owner_id, array $proposal, array
 	$proposal_title = esc_html( $proposal['title'] ?? 'Proposal' );
 
 	// Owner notification.
+	/* translators: %s is the proposal title */
 	$subject = sprintf( __( '💰 Payment received for "%s"', 'clientflow' ), $proposal['title'] ?? 'Proposal' );
 	wp_mail(
 		$owner->user_email,
 		$subject,
-		cf_email_html( [
+		clientflow_email_html( [
 			'name'      => $owner->display_name,
 			'body'      => "<p style=\"margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;\">A payment of <strong style=\"color:#1A1A2E;\">{$amount_fmt}</strong> has been received for your proposal <em>{$proposal_title}</em>.</p>",
 			'cta_label' => __( 'View Proposal', 'clientflow' ),
@@ -515,8 +517,9 @@ function cf_notify_owner_payment_complete( int $owner_id, array $proposal, array
 		if ( $client_row && ! empty( $client_row['email'] ) ) {
 			wp_mail(
 				$client_row['email'],
+				/* translators: %s is the proposal title */
 				sprintf( __( 'Payment confirmed — %s', 'clientflow' ), $proposal['title'] ?? 'Proposal' ),
-				cf_email_html( [
+				clientflow_email_html( [
 					'name'      => $client_row['name'] ?? '',
 					'body'      => "<p style=\"margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;\">We have received your payment of <strong style=\"color:#1A1A2E;\">{$amount_fmt}</strong> for <em>{$proposal_title}</em>. Thank you!</p><p style=\"margin:0;font-size:16px;color:#6B7280;line-height:1.65;\">You can view your payment history from your client portal.</p>",
 					'cta_label' => __( 'Go to Portal', 'clientflow' ),

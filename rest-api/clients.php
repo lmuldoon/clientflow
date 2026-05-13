@@ -11,6 +11,8 @@
 
 declare( strict_types=1 );
 
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- All table variables use $wpdb->prefix with hardcoded slugs, not user input.
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -20,24 +22,24 @@ add_action( 'rest_api_init', static function (): void {
 
 	register_rest_route( $ns, '/clients', [
 		'methods'             => WP_REST_Server::READABLE,
-		'callback'            => 'cf_rest_list_clients',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_list_clients',
+		'permission_callback' => 'clientflow_rest_require_auth',
 	] );
 
 	register_rest_route( $ns, '/clients/(?P<id>\d+)/invite', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_invite_client',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_invite_client',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [
 			'id' => [ 'type' => 'integer', 'required' => true ],
 		],
 	] );
 } );
 
-function cf_rest_list_clients( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_rest_list_clients( WP_REST_Request $request ): WP_REST_Response {
 	global $wpdb;
 
-	$user_id = cf_get_owner_id( get_current_user_id() );
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$ct      = $wpdb->prefix . 'clientflow_clients';
 	$pt      = $wpdb->prefix . 'clientflow_proposals';
 
@@ -76,18 +78,18 @@ function cf_rest_list_clients( WP_REST_Request $request ): WP_REST_Response {
 	return new WP_REST_Response( [ 'clients' => $clients ], 200 );
 }
 
-function cf_rest_invite_client( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_invite_client( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	global $wpdb;
 
-	$user_id = cf_get_owner_id( get_current_user_id() );
+	$user_id = clientflow_get_owner_id( get_current_user_id() );
 	$client_id = (int) $request->get_param( 'id' );
 
-	if ( ! cf_rest_rate_limit( 'invite_client', $user_id, 20 ) ) {
+	if ( ! clientflow_rest_rate_limit( 'invite_client', $user_id, 20 ) ) {
 		return new WP_Error( 'rate_limited', __( 'Too many requests. Please wait a moment.', 'clientflow' ), [ 'status' => 429 ] );
 	}
 
 	// Gate: owner must have portal access.
-	if ( ! cf_can_user( $user_id, 'use_portal' ) ) {
+	if ( ! clientflow_can_user( $user_id, 'use_portal' ) ) {
 		return new WP_Error(
 			'plan_required',
 			__( 'Upgrade to Pro or Agency to send portal invitations.', 'clientflow' ),

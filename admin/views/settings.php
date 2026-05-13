@@ -17,13 +17,15 @@ if ( ! current_user_can( 'manage_options' ) ) {
 	wp_die( esc_html__( 'Insufficient permissions.', 'clientflow' ) );
 }
 
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- View-scope variables; this file is only included from the admin page callback and never in global scope.
+
 // ── Save handler ──────────────────────────────────────────────────────────────
 
 $saved  = false;
 $errors = [];
 
-if ( 'POST' === $_SERVER['REQUEST_METHOD'] && ! empty( $_POST['cf_settings_nonce'] ) ) {
-	if ( wp_verify_nonce( $_POST['cf_settings_nonce'], 'cf_save_settings' ) ) {
+if ( isset( $_SERVER['REQUEST_METHOD'] ) && 'POST' === $_SERVER['REQUEST_METHOD'] && ! empty( $_POST['clientflow_settings_nonce'] ) ) {
+	if ( wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['clientflow_settings_nonce'] ) ), 'clientflow_save_settings' ) ) {
 		// Branding options: available to all plans.
 		$fields = [
 			'clientflow_business_name' => 'sanitize_text_field',
@@ -34,20 +36,20 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && ! empty( $_POST['cf_settings_nonce
 		];
 
 		foreach ( $fields as $option => $sanitizer ) {
-			$value = isset( $_POST[ $option ] ) ? call_user_func( $sanitizer, wp_unslash( $_POST[ $option ] ) ) : '';
+			$value = isset( $_POST[ $option ] ) ? call_user_func( $sanitizer, wp_unslash( $_POST[ $option ] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitized via $sanitizer callback registered above.
 			update_option( $option, $value );
 		}
 
 		// Stripe options: paid plans only — do not overwrite on free to avoid clearing stored keys.
-		$_save_owner_id = cf_get_owner_id( get_current_user_id() );
-		if ( cf_can_user( $_save_owner_id, 'use_payments' ) ) {
+		$_save_owner_id = clientflow_get_owner_id( get_current_user_id() );
+		if ( clientflow_can_user( $_save_owner_id, 'use_payments' ) ) {
 			update_option( 'clientflow_stripe_publishable_key', sanitize_text_field( wp_unslash( $_POST['clientflow_stripe_publishable_key'] ?? '' ) ) );
 			update_option( 'clientflow_stripe_secret_key',      sanitize_text_field( wp_unslash( $_POST['clientflow_stripe_secret_key'] ?? '' ) ) );
 			update_option( 'clientflow_stripe_webhook_secret',  sanitize_text_field( wp_unslash( $_POST['clientflow_stripe_webhook_secret'] ?? '' ) ) );
 		}
 
 		// Testimonial options: paid plans only.
-		if ( cf_can_user( $_save_owner_id, 'use_testimonials' ) ) {
+		if ( clientflow_can_user( $_save_owner_id, 'use_testimonials' ) ) {
 			update_option( 'clientflow_testimonial_body',      sanitize_textarea_field( wp_unslash( $_POST['clientflow_testimonial_body'] ?? '' ) ) );
 			update_option( 'clientflow_testimonial_url',       esc_url_raw( wp_unslash( $_POST['clientflow_testimonial_url'] ?? '' ) ) );
 			update_option( 'clientflow_testimonial_cta_label', sanitize_text_field( wp_unslash( $_POST['clientflow_testimonial_cta_label'] ?? '' ) ) );
@@ -82,9 +84,9 @@ $testimonial_body       = get_option( 'clientflow_testimonial_body', '' );
 $testimonial_review_url = get_option( 'clientflow_testimonial_url', '' );
 $testimonial_cta_label  = get_option( 'clientflow_testimonial_cta_label', '' );
 
-$cf_owner_id        = cf_get_owner_id( get_current_user_id() );
-$cf_payments_locked = ! cf_can_user( $cf_owner_id, 'use_payments' );
-$cf_is_free         = ! cf_can_user( $cf_owner_id, 'use_testimonials' );
+$cf_owner_id        = clientflow_get_owner_id( get_current_user_id() );
+$cf_payments_locked = ! clientflow_can_user( $cf_owner_id, 'use_payments' );
+$cf_is_free         = ! clientflow_can_user( $cf_owner_id, 'use_testimonials' );
 
 ?>
 <div>
@@ -384,7 +386,7 @@ $cf_is_free         = ! cf_can_user( $cf_owner_id, 'use_testimonials' );
 	<?php endif; ?>
 
 	<form method="POST" action="">
-		<?php wp_nonce_field( 'cf_save_settings', 'cf_settings_nonce' ); ?>
+		<?php wp_nonce_field( 'clientflow_save_settings', 'clientflow_settings_nonce' ); ?>
 
 		<div class="cf-settings-grid">
 
@@ -589,6 +591,7 @@ $cf_is_free         = ! cf_can_user( $cf_owner_id, 'use_testimonials' );
 				<p class="cf-card__desc">
 					<?php
 					printf(
+						/* translators: %s is a <code> HTML element containing the checkout.session.completed event name */
 						esc_html__( 'Add this URL in your Stripe Dashboard under Developers → Webhooks. Listen for the %s event.', 'clientflow' ),
 						'<code>checkout.session.completed</code>'
 					);

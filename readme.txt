@@ -1,8 +1,8 @@
 === ClientFlow ===
 Contributors: clientflow
-Tags: proposal, proposals, client portal, client management, freelancer, agency, project management, stripe, payments, crm, invoices, quotations
+Tags: proposal, client portal, client management, freelancer, agency
 Requires at least: 6.0
-Tested up to: 6.5
+Tested up to: 6.9
 Requires PHP: 8.0
 Stable tag: 0.1.2
 License: GPLv2 or later

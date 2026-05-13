@@ -10,35 +10,37 @@
  */
 
 declare( strict_types = 1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Template-scope variables use clientflow_ prefix; DB queries use trusted table constants.
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 // Re-read the page from query var (routing.php already validated it).
-$cf_portal_page = get_query_var( 'cf_portal_page', 'login' );
+$clientflow_portal_page = get_query_var( 'clientflow_portal_page', 'login' );
 
 // Client data for authenticated pages.
-$cf_client_data = null;
+$clientflow_client_data = null;
 if ( ClientFlow_Portal_Auth::is_authenticated() ) {
-	$cf_client_data = ClientFlow_Portal_Data::get_client( get_current_user_id() );
+	$clientflow_client_data = ClientFlow_Portal_Data::get_client( get_current_user_id() );
 }
 
 // Business identity.
-$cf_business_name = get_option( 'blogname', '' );
-$cf_business_logo = get_option( 'clientflow_logo_url', '' );
-$cf_brand_color   = get_option( 'clientflow_brand_color', '#6366F1' );
+$clientflow_business_name = get_option( 'blogname', '' );
+$clientflow_business_logo = get_option( 'clientflow_logo_url', '' );
+$clientflow_brand_color   = get_option( 'clientflow_brand_color', '#6366F1' );
 
 // For the verify page, pass the raw token from the query string so the
 // PortalVerify component can fire the verify API immediately on mount.
-$cf_verify_token = '';
-if ( 'verify' === $cf_portal_page ) {
-	$cf_verify_token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
+$clientflow_verify_token = '';
+if ( 'verify' === $clientflow_portal_page ) {
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only routing token, no state change occurs here.
+	$clientflow_verify_token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
 }
 
 // Determine if the admin owner has the agency plan (projects are agency-only).
-$cf_has_projects = false;
+$clientflow_has_projects = false;
 if ( ClientFlow_Portal_Auth::is_authenticated() ) {
 	global $wpdb;
-	$owner_id = (int) $wpdb->get_var(
+	$clientflow_owner_id = (int) $wpdb->get_var(
 		$wpdb->prepare(
 			"SELECT p.owner_id
 			 FROM {$wpdb->prefix}clientflow_proposals p
@@ -49,27 +51,27 @@ if ( ClientFlow_Portal_Auth::is_authenticated() ) {
 			get_current_user_id()
 		)
 	);
-	if ( $owner_id ) {
-		$cf_has_projects = (bool) ClientFlow_Entitlements::can_user( $owner_id, 'use_projects' );
+	if ( $clientflow_owner_id ) {
+		$clientflow_has_projects = (bool) ClientFlow_Entitlements::can_user( $clientflow_owner_id, 'use_projects' );
 	}
 }
 
 // Nonce for WP REST API calls.
-$cf_nonce = wp_create_nonce( 'wp_rest' );
+$clientflow_nonce = wp_create_nonce( 'wp_rest' );
 
 // Asset manifest.
-$asset_file = CLIENTFLOW_DIR . 'build/portal.asset.php';
-$asset      = file_exists( $asset_file ) ? require $asset_file : [ 'version' => CLIENTFLOW_VERSION, 'dependencies' => [] ];
-$ver        = $asset['version'];
-$bundle_url = plugins_url( 'build/portal.js', CLIENTFLOW_DIR . 'clientflow.php' );
+$clientflow_asset_file = CLIENTFLOW_DIR . 'build/portal.asset.php';
+$clientflow_asset      = file_exists( $clientflow_asset_file ) ? require $clientflow_asset_file : [ 'version' => CLIENTFLOW_VERSION, 'dependencies' => [] ];
+$clientflow_ver        = $clientflow_asset['version'];
+$clientflow_bundle_url = plugins_url( 'build/portal.js', CLIENTFLOW_DIR . 'clientflow.php' );
 
 // Enqueue portal bundle with its dependencies so WordPress loads wp-element,
 // react, react-jsx-runtime etc. before the bundle runs.
-$deps = array_unique( array_merge( $asset['dependencies'], [ 'wp-element' ] ) );
-wp_enqueue_script( 'cf-portal', $bundle_url, $deps, $ver, true );
+$clientflow_deps = array_unique( array_merge( $clientflow_asset['dependencies'], [ 'wp-element' ] ) );
+wp_enqueue_script( 'cf-portal', $clientflow_bundle_url, $clientflow_deps, $clientflow_ver, true );
 
 // Page title.
-$page_titles = [
+$clientflow_page_titles = [
 	'login'     => 'Login',
 	'verify'    => 'Verifying…',
 	'dashboard' => 'Dashboard',
@@ -77,14 +79,14 @@ $page_titles = [
 	'projects'  => 'Projects',
 	'payments'  => 'Payments',
 ];
-$page_title = $page_titles[ $cf_portal_page ] ?? 'Portal';
+$clientflow_page_title = $clientflow_page_titles[ $clientflow_portal_page ] ?? 'Portal';
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
 <meta charset="<?php bloginfo( 'charset' ); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><?php echo esc_html( $page_title . ' — ' . $cf_business_name ); ?></title>
+<title><?php echo esc_html( $clientflow_page_title . ' — ' . $clientflow_business_name ); ?></title>
 <meta name="robots" content="noindex, nofollow">
 <?php wp_head(); ?>
 <style>
@@ -99,17 +101,17 @@ body { margin: 0; background: #F8F7F5; }
 
 <script>
 window.cfPortalData = <?php echo wp_json_encode( [
-	'page'            => $cf_portal_page,
+	'page'            => $clientflow_portal_page,
 	'apiUrl'          => esc_url_raw( rest_url( 'clientflow/v1' ) ),
-	'nonce'           => $cf_nonce,
+	'nonce'           => $clientflow_nonce,
 	'isAuthenticated' => ClientFlow_Portal_Auth::is_authenticated(),
-	'clientData'      => $cf_client_data,
-	'businessName'    => $cf_business_name,
-	'businessLogo'    => $cf_business_logo,
-	'brandColor'      => $cf_brand_color,
-	'verifyToken'     => $cf_verify_token,
+	'clientData'      => $clientflow_client_data,
+	'businessName'    => $clientflow_business_name,
+	'businessLogo'    => $clientflow_business_logo,
+	'brandColor'      => $clientflow_brand_color,
+	'verifyToken'     => $clientflow_verify_token,
 	'pluginUrl'       => CLIENTFLOW_URL,
-	'hasProjects'     => $cf_has_projects,
+	'hasProjects'     => $clientflow_has_projects,
 ] ); ?>;
 </script>
 

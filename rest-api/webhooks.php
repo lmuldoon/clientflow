@@ -8,7 +8,7 @@
  * DELETE /clientflow/v1/webhooks/{id}     — delete webhook + its logs
  * POST   /clientflow/v1/webhooks/{id}/test — send a test ping immediately
  *
- * All routes require a logged-in WordPress session (cf_rest_require_auth).
+ * All routes require a logged-in WordPress session (clientflow_rest_require_auth).
  * Write operations are additionally gated to Pro/Agency plan (use_webhooks).
  *
  * @package ClientFlow\Webhooks
@@ -16,6 +16,8 @@
  */
 
 declare( strict_types=1 );
+
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- All table variables use $wpdb->prefix with hardcoded slugs, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -41,46 +43,46 @@ add_action( 'rest_api_init', static function (): void {
 	register_rest_route( $ns, '/webhooks', [
 		[
 			'methods'             => WP_REST_Server::READABLE,
-			'callback'            => 'cf_rest_list_webhooks',
-			'permission_callback' => 'cf_rest_require_auth',
+			'callback'            => 'clientflow_rest_list_webhooks',
+			'permission_callback' => 'clientflow_rest_require_auth',
 		],
 		[
 			'methods'             => WP_REST_Server::CREATABLE,
-			'callback'            => 'cf_rest_create_webhook',
-			'permission_callback' => 'cf_rest_require_auth',
-			'args'                => cf_webhook_args(),
+			'callback'            => 'clientflow_rest_create_webhook',
+			'permission_callback' => 'clientflow_rest_require_auth',
+			'args'                => clientflow_webhook_args(),
 		],
 	] );
 
 	register_rest_route( $ns, '/webhooks/(?P<id>\d+)', [
 		[
 			'methods'             => 'PATCH',
-			'callback'            => 'cf_rest_update_webhook',
-			'permission_callback' => 'cf_rest_require_auth',
+			'callback'            => 'clientflow_rest_update_webhook',
+			'permission_callback' => 'clientflow_rest_require_auth',
 			'args'                => array_merge(
 				[ 'id' => [ 'type' => 'integer', 'required' => true ] ],
-				cf_webhook_args( false )
+				clientflow_webhook_args( false )
 			),
 		],
 		[
 			'methods'             => WP_REST_Server::DELETABLE,
-			'callback'            => 'cf_rest_delete_webhook',
-			'permission_callback' => 'cf_rest_require_auth',
+			'callback'            => 'clientflow_rest_delete_webhook',
+			'permission_callback' => 'clientflow_rest_require_auth',
 			'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 		],
 	] );
 
 	register_rest_route( $ns, '/webhooks/(?P<id>\d+)/test', [
 		'methods'             => WP_REST_Server::CREATABLE,
-		'callback'            => 'cf_rest_test_webhook',
-		'permission_callback' => 'cf_rest_require_auth',
+		'callback'            => 'clientflow_rest_test_webhook',
+		'permission_callback' => 'clientflow_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
 } );
 
 // ── Shared arg definitions ────────────────────────────────────────────────────
 
-function cf_webhook_args( bool $required = true ): array {
+function clientflow_webhook_args( bool $required = true ): array {
 	return [
 		'url'     => [
 			'type'              => 'string',
@@ -104,10 +106,10 @@ function cf_webhook_args( bool $required = true ): array {
 /**
  * GET /webhooks
  */
-function cf_rest_list_webhooks( WP_REST_Request $request ): WP_REST_Response {
+function clientflow_rest_list_webhooks( WP_REST_Request $request ): WP_REST_Response {
 	global $wpdb;
 
-	$owner_id = cf_get_owner_id( get_current_user_id() );
+	$owner_id = clientflow_get_owner_id( get_current_user_id() );
 	$wt       = $wpdb->prefix . 'clientflow_webhooks';
 	$lt       = $wpdb->prefix . 'clientflow_webhook_logs';
 
@@ -145,21 +147,21 @@ function cf_rest_list_webhooks( WP_REST_Request $request ): WP_REST_Response {
 /**
  * POST /webhooks
  */
-function cf_rest_create_webhook( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_create_webhook( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	global $wpdb;
 
-	$owner_id = cf_get_owner_id( get_current_user_id() );
+	$owner_id = clientflow_get_owner_id( get_current_user_id() );
 
-	if ( ! cf_rest_rate_limit( 'webhooks_write', $owner_id, 30 ) ) {
+	if ( ! clientflow_rest_rate_limit( 'webhooks_write', $owner_id, 30 ) ) {
 		return new WP_Error( 'rate_limited', __( 'Too many requests. Please wait a moment.', 'clientflow' ), [ 'status' => 429 ] );
 	}
 
-	if ( ! cf_can_user( $owner_id, 'use_webhooks' ) ) {
+	if ( ! clientflow_can_user( $owner_id, 'use_webhooks' ) ) {
 		return new WP_Error( 'plan_required', __( 'Upgrade to Pro or Agency to use webhooks.', 'clientflow' ), [ 'status' => 403 ] );
 	}
 
 	$url    = (string) $request->get_param( 'url' );
-	$events = cf_sanitize_webhook_events( (array) $request->get_param( 'events' ) );
+	$events = clientflow_sanitize_webhook_events( (array) $request->get_param( 'events' ) );
 
 	if ( empty( $url ) ) {
 		return new WP_Error( 'invalid_url', __( 'A valid URL is required.', 'clientflow' ), [ 'status' => 422 ] );
@@ -206,16 +208,16 @@ function cf_rest_create_webhook( WP_REST_Request $request ): WP_REST_Response|WP
 /**
  * PATCH /webhooks/{id}
  */
-function cf_rest_update_webhook( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_update_webhook( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	global $wpdb;
 
-	$owner_id = cf_get_owner_id( get_current_user_id() );
+	$owner_id = clientflow_get_owner_id( get_current_user_id() );
 
-	if ( ! cf_rest_rate_limit( 'webhooks_write', $owner_id, 30 ) ) {
+	if ( ! clientflow_rest_rate_limit( 'webhooks_write', $owner_id, 30 ) ) {
 		return new WP_Error( 'rate_limited', __( 'Too many requests. Please wait a moment.', 'clientflow' ), [ 'status' => 429 ] );
 	}
 
-	if ( ! cf_can_user( $owner_id, 'use_webhooks' ) ) {
+	if ( ! clientflow_can_user( $owner_id, 'use_webhooks' ) ) {
 		return new WP_Error( 'plan_required', __( 'Upgrade to Pro or Agency to use webhooks.', 'clientflow' ), [ 'status' => 403 ] );
 	}
 
@@ -244,7 +246,7 @@ function cf_rest_update_webhook( WP_REST_Request $request ): WP_REST_Response|WP
 	}
 
 	if ( null !== $request->get_param( 'events' ) ) {
-		$events = cf_sanitize_webhook_events( (array) $request->get_param( 'events' ) );
+		$events = clientflow_sanitize_webhook_events( (array) $request->get_param( 'events' ) );
 		if ( empty( $events ) ) {
 			return new WP_Error( 'no_events', __( 'Select at least one event.', 'clientflow' ), [ 'status' => 422 ] );
 		}
@@ -279,10 +281,10 @@ function cf_rest_update_webhook( WP_REST_Request $request ): WP_REST_Response|WP
 /**
  * DELETE /webhooks/{id}
  */
-function cf_rest_delete_webhook( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_delete_webhook( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	global $wpdb;
 
-	$owner_id = cf_get_owner_id( get_current_user_id() );
+	$owner_id = clientflow_get_owner_id( get_current_user_id() );
 	$id       = (int) $request->get_param( 'id' );
 
 	$exists = $wpdb->get_var(
@@ -306,12 +308,12 @@ function cf_rest_delete_webhook( WP_REST_Request $request ): WP_REST_Response|WP
 /**
  * POST /webhooks/{id}/test
  */
-function cf_rest_test_webhook( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+function clientflow_rest_test_webhook( WP_REST_Request $request ): WP_REST_Response|WP_Error {
 	global $wpdb;
 
-	$owner_id = cf_get_owner_id( get_current_user_id() );
+	$owner_id = clientflow_get_owner_id( get_current_user_id() );
 
-	if ( ! cf_rest_rate_limit( 'webhooks_write', $owner_id, 30 ) ) {
+	if ( ! clientflow_rest_rate_limit( 'webhooks_write', $owner_id, 30 ) ) {
 		return new WP_Error( 'rate_limited', __( 'Too many requests. Please wait a moment.', 'clientflow' ), [ 'status' => 429 ] );
 	}
 
@@ -362,18 +364,22 @@ function cf_rest_test_webhook( WP_REST_Request $request ): WP_REST_Response|WP_E
 		[ '%d', '%s', '%d', '%d', '%s' ]
 	);
 
+	/* translators: %d is the HTTP response status code */
+	$clientflow_success_msg = sprintf( __( 'Test delivered successfully (HTTP %d).', 'clientflow' ), $code );
+	/* translators: %d is the HTTP response status code */
+	$clientflow_failure_msg = sprintf( __( 'Delivery failed (HTTP %d). Check the URL and try again.', 'clientflow' ), $code );
+	$clientflow_webhook_msg = $success ? $clientflow_success_msg : $clientflow_failure_msg;
+
 	return new WP_REST_Response( [
 		'success'       => $success,
 		'response_code' => $code,
-		'message'       => $success
-			? sprintf( __( 'Test delivered successfully (HTTP %d).', 'clientflow' ), $code )
-			: sprintf( __( 'Delivery failed (HTTP %d). Check the URL and try again.', 'clientflow' ), $code ),
+		'message'       => $clientflow_webhook_msg,
 	], 200 );
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function cf_sanitize_webhook_events( array $raw ): array {
+function clientflow_sanitize_webhook_events( array $raw ): array {
 	return array_values( array_filter(
 		array_map( 'sanitize_text_field', $raw ),
 		static fn( string $e ): bool => in_array( $e, CF_WEBHOOK_EVENTS, true )

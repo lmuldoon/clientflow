@@ -16,6 +16,7 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -30,10 +31,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * @return void
  */
-function cf_webhook_dispatch( string $event, int $owner_id, array $data ): void {
+function clientflow_webhook_dispatch( string $event, int $owner_id, array $data ): void {
 	global $wpdb;
 
-	if ( ! cf_can_user( $owner_id, 'use_webhooks' ) ) {
+	if ( ! clientflow_can_user( $owner_id, 'use_webhooks' ) ) {
 		return;
 	}
 

@@ -29,7 +29,7 @@ class ClientFlow_AI_Service {
 	public static function process( int $user_id, string $action, string $text, string $brief = '' ): array|WP_Error {
 		// ── Plan gate ─────────────────────────────────────────────────────────
 
-		if ( ! cf_can_user( $user_id, 'use_ai' ) ) {
+		if ( ! clientflow_can_user( $user_id, 'use_ai' ) ) {
 			return new WP_Error(
 				'plan_required',
 				__( 'AI writing tools require a Pro or Agency plan. Please upgrade to access this feature.', 'clientflow' ),

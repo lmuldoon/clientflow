@@ -20,6 +20,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class ClientFlow_Proposal {
 
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; table() returns a trusted constant, not user input.
+
 	// ── Schema ────────────────────────────────────────────────────────────────
 
 	/**
@@ -49,7 +51,7 @@ class ClientFlow_Proposal {
 	/**
 	 * Create a new proposal.
 	 *
-	 * Enforces the free-tier 5-proposal limit via cf_can_user().
+	 * Enforces the free-tier 5-proposal limit via clientflow_can_user().
 	 * Increments the usage counter after a successful insert.
 	 *
 	 * @param int   $owner_id WordPress user ID of the creator.
@@ -61,7 +63,7 @@ class ClientFlow_Proposal {
 		global $wpdb;
 
 		// ── Entitlement check ────────────────────────────────────────────────
-		if ( ! cf_can_user( $owner_id, 'create_proposal' ) ) {
+		if ( ! clientflow_can_user( $owner_id, 'create_proposal' ) ) {
 			return new WP_Error(
 				'proposal_limit_reached',
 				sprintf(
@@ -96,7 +98,7 @@ class ClientFlow_Proposal {
 		$row['token'] = self::generate_token();
 
 		// Enable payment if owner has Pro/Agency.
-		if ( cf_can_user( $owner_id, 'use_payments' ) ) {
+		if ( clientflow_can_user( $owner_id, 'use_payments' ) ) {
 			$row['payment_enabled'] = 1;
 		}
 
@@ -342,7 +344,7 @@ class ClientFlow_Proposal {
 		self::log_event( $id, 'sent' );
 
 		// Allow modules (e.g. portal) to react to a proposal being sent.
-		do_action( 'cf_proposal_sent', $id, $owner_id );
+		do_action( 'clientflow_proposal_sent', $id, $owner_id );
 
 		return true;
 	}
@@ -386,14 +388,14 @@ class ClientFlow_Proposal {
 		);
 
 		if ( $project ) {
-			if ( 'completed' !== $project->status ) {
+			if ( clientflow_can_user( $owner_id, 'use_projects' ) && 'completed' !== $project->status ) {
 				return new WP_Error(
 					'proposal_has_active_project',
 					__( 'This proposal has an active project. Complete or delete the project first.', 'clientflow' ),
 					[ 'status' => 422 ]
 				);
 			}
-			// Project is completed — cascade soft-delete it alongside the proposal.
+			// Project is completed, or owner is not on Agency plan — cascade soft-delete alongside the proposal.
 			$wpdb->update(
 				$wpdb->prefix . 'clientflow_projects',
 				[ 'deleted_at' => current_time( 'mysql' ) ],
@@ -634,8 +636,8 @@ class ClientFlow_Proposal {
 			[
 				'proposal_id' => $proposal_id,
 				'event_type'  => $event_type,
-				'user_ip'     => sanitize_text_field( $_SERVER['REMOTE_ADDR'] ?? '' ),
-				'user_agent'  => sanitize_text_field( $_SERVER['HTTP_USER_AGENT'] ?? '' ),
+				'user_ip'     => sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) ),
+				'user_agent'  => sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ?? '' ) ),
 				'timestamp'   => current_time( 'mysql' ),
 				'metadata'    => $metadata ? wp_json_encode( $metadata ) : null,
 			],

@@ -15,89 +15,90 @@
  */
 
 declare( strict_types = 1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 // ── Register query vars ───────────────────────────────────────────────────────
 
 add_filter( 'query_vars', function( array $vars ): array {
-	$vars[] = 'cf_portal_page';
+	$vars[] = 'clientflow_portal_page';
 	return $vars;
 } );
 
 // ── Rewrite rules ─────────────────────────────────────────────────────────────
 
-add_action( 'init', 'cf_add_portal_rewrite_rules' );
+add_action( 'init', 'clientflow_add_portal_rewrite_rules' );
 
-function cf_add_portal_rewrite_rules(): void {
+function clientflow_add_portal_rewrite_rules(): void {
 	// /portal → redirect to /portal/login (handled in template_redirect below).
 	add_rewrite_rule(
 		'^clientflow/?$',
-		'index.php?cf_portal_page=login',
+		'index.php?clientflow_portal_page=login',
 		'top'
 	);
 
 	add_rewrite_rule(
 		'^clientflow/login/?$',
-		'index.php?cf_portal_page=login',
+		'index.php?clientflow_portal_page=login',
 		'top'
 	);
 
 	add_rewrite_rule(
 		'^clientflow/verify/?$',
-		'index.php?cf_portal_page=verify',
+		'index.php?clientflow_portal_page=verify',
 		'top'
 	);
 
 	add_rewrite_rule(
 		'^clientflow/dashboard/?$',
-		'index.php?cf_portal_page=dashboard',
+		'index.php?clientflow_portal_page=dashboard',
 		'top'
 	);
 
 	add_rewrite_rule(
 		'^clientflow/proposals/?$',
-		'index.php?cf_portal_page=proposals',
+		'index.php?clientflow_portal_page=proposals',
 		'top'
 	);
 
 	add_rewrite_rule(
 		'^clientflow/payments/?$',
-		'index.php?cf_portal_page=payments',
+		'index.php?clientflow_portal_page=payments',
 		'top'
 	);
 
 	add_rewrite_rule(
 		'^clientflow/projects/?$',
-		'index.php?cf_portal_page=projects',
+		'index.php?clientflow_portal_page=projects',
 		'top'
 	);
 
 	add_rewrite_rule(
 		'^clientflow/set-password/?$',
-		'index.php?cf_portal_page=set-password',
+		'index.php?clientflow_portal_page=set-password',
 		'top'
 	);
 
 	add_rewrite_rule(
 		'^clientflow/receipt/?$',
-		'index.php?cf_portal_page=receipt',
+		'index.php?clientflow_portal_page=receipt',
 		'top'
 	);
 
 	add_rewrite_rule(
 		'^clientflow/logout/?$',
-		'index.php?cf_portal_page=logout',
+		'index.php?clientflow_portal_page=logout',
 		'top'
 	);
 }
 
 // ── Template redirect ─────────────────────────────────────────────────────────
 
-add_action( 'template_redirect', 'cf_portal_template_redirect' );
+add_action( 'template_redirect', 'clientflow_portal_template_redirect' );
 
-function cf_portal_template_redirect(): void {
-	$page = get_query_var( 'cf_portal_page' );
+function clientflow_portal_template_redirect(): void {
+	$page = get_query_var( 'clientflow_portal_page' );
 
 	if ( ! $page ) {
 		return;

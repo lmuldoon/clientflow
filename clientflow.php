@@ -106,7 +106,7 @@ if ( ! function_exists( 'clientflow_fs' ) ) {
 		if ( ! get_option( 'clientflow_license_key', '' ) ) {
 			update_option( 'clientflow_license_key', $license->secret_key );
 		}
-		$owner_id = cf_get_owner_id( get_current_user_id() );
+		$owner_id = clientflow_get_owner_id( get_current_user_id() );
 		if ( 'free' === ClientFlow_Entitlements::get_user_plan( $owner_id ) ) {
 			$plan_name = strtolower( (string) clientflow_fs()->get_plan_name() );
 			if ( in_array( $plan_name, [ 'pro', 'agency' ], true ) ) {
@@ -120,8 +120,9 @@ if ( ! function_exists( 'clientflow_fs' ) ) {
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-define( 'CLIENTFLOW_VERSION',    '0.1.2' );
-define( 'CLIENTFLOW_DB_VERSION', '12' );
+define( 'CLIENTFLOW_VERSION',        '0.1.2' );
+define( 'CLIENTFLOW_DB_VERSION',     '12' );
+define( 'CLIENTFLOW_REWRITE_VERSION', '2' );
 define( 'CLIENTFLOW_DIR',        plugin_dir_path( __FILE__ ) );
 define( 'CLIENTFLOW_URL',        plugin_dir_url( __FILE__ ) );
 define( 'CLIENTFLOW_BASENAME',   plugin_basename( __FILE__ ) );
@@ -193,7 +194,7 @@ spl_autoload_register( static function ( string $class ): void {
  *
  * @return bool|string Boolean for most features; string for portal tier.
  */
-function cf_can_user( int $user_id, string $feature, array $options = [] ): bool|string {
+function clientflow_can_user( int $user_id, string $feature, array $options = [] ): bool|string {
 	return ClientFlow_Entitlements::can_user( $user_id, $feature, $options );
 }
 
@@ -207,13 +208,39 @@ function cf_can_user( int $user_id, string $feature, array $options = [] ): bool
  * @param int $user_id WordPress user ID (typically get_current_user_id()).
  * @return int The owner user ID, or $user_id if not a team member.
  */
-function cf_get_owner_id( int $user_id ): int {
+function clientflow_get_owner_id( int $user_id ): int {
 	global $wpdb;
-	$owner = $wpdb->get_var( $wpdb->prepare(
+	$owner = $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		"SELECT owner_id FROM {$wpdb->prefix}clientflow_team_members WHERE member_user_id = %d LIMIT 1",
 		$user_id
 	) );
 	return $owner ? (int) $owner : $user_id;
+}
+
+/**
+ * Return #ffffff or #1A1A2E — whichever has better WCAG contrast against $hex.
+ *
+ * Uses relative luminance (WCAG 2.1) with a threshold of 0.35.
+ *
+ * @param string $hex Hex color with or without leading #. Three- or six-digit.
+ * @return string '#ffffff' or '#1A1A2E'
+ */
+function clientflow_accessible_text_color( string $hex ): string {
+	$hex = ltrim( $hex, '#' );
+	if ( 3 === strlen( $hex ) ) {
+		$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+	}
+	if ( 6 !== strlen( $hex ) ) {
+		return '#ffffff';
+	}
+	$r = hexdec( substr( $hex, 0, 2 ) ) / 255;
+	$g = hexdec( substr( $hex, 2, 2 ) ) / 255;
+	$b = hexdec( substr( $hex, 4, 2 ) ) / 255;
+	$linearise = static function ( float $c ): float {
+		return $c <= 0.04045 ? $c / 12.92 : ( ( $c + 0.055 ) / 1.055 ) ** 2.4;
+	};
+	$luminance = 0.2126 * $linearise( $r ) + 0.7152 * $linearise( $g ) + 0.0722 * $linearise( $b );
+	return $luminance > 0.35 ? '#1A1A2E' : '#ffffff';
 }
 
 /**
@@ -229,15 +256,16 @@ function cf_get_owner_id( int $user_id ): int {
  * }
  * @return string Full HTML email document.
  */
-function cf_email_html( array $args ): string {
+function clientflow_email_html( array $args ): string {
 	$business_name = esc_html( $args['business_name'] ?? get_option( 'blogname', 'ClientFlow' ) );
 	$name          = esc_html( $args['name'] ?? '' );
 	$greeting      = $name ? "Hi {$name}," : 'Hi there,';
 	$body          = $args['body'] ?? '';
 	$title_tag     = ! empty( $args['subject'] ) ? '<title>' . esc_html( $args['subject'] ) . '</title>' : '';
 
-	$brand_color   = get_option( 'clientflow_brand_color', '#6366F1' );
-	$logo_url      = get_option( 'clientflow_logo_url', '' );
+	$brand_color        = get_option( 'clientflow_brand_color', '#6366F1' );
+	$button_text_color  = clientflow_accessible_text_color( $brand_color );
+	$logo_url           = get_option( 'clientflow_logo_url', '' );
 	$cf_logo_url   = CLIENTFLOW_URL . 'assets/images/logo.png';
 
 	$logo_html = '';
@@ -261,7 +289,7 @@ function cf_email_html( array $args ): string {
             <td style=\"padding-bottom:36px;text-align:center;\">
               <a href=\"{$href}\"
                  style=\"display:inline-block;padding:16px 40px;background:{$brand_color};
-                         color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;
+                         color:{$button_text_color};font-size:16px;font-weight:600;text-decoration:none;
                          border-radius:12px;letter-spacing:0.01em;\">
                 {$label}
               </a>
@@ -279,6 +307,7 @@ function cf_email_html( array $args ): string {
           </tr>";
 	}
 
+	// phpcs:disable PluginCheck.CodeAnalysis.Heredoc.NotAllowed
 	return <<<HTML
 <!DOCTYPE html>
 <html lang="en">
@@ -336,6 +365,7 @@ function cf_email_html( array $args ): string {
 </body>
 </html>
 HTML;
+	// phpcs:enable PluginCheck.CodeAnalysis.Heredoc.NotAllowed
 }
 
 /**
@@ -350,8 +380,8 @@ HTML;
  * @param int    $window  Window length in seconds (default 60).
  * @return bool True = allowed, false = rate limited.
  */
-function cf_rest_rate_limit( string $action, int $user_id, int $limit = 60, int $window = 60 ): bool {
-	$key   = 'cf_rl_' . md5( $action . '_' . $user_id );
+function clientflow_rest_rate_limit( string $action, int $user_id, int $limit = 60, int $window = 60 ): bool {
+	$key   = 'clientflow_rl_' . md5( $action . '_' . $user_id );
 	$count = (int) get_transient( $key );
 	if ( $count >= $limit ) {
 		return false;
@@ -397,7 +427,6 @@ final class ClientFlow {
 	 * Register all WordPress hooks.
 	 */
 	private function register_hooks(): void {
-		add_action( 'init',                    [ $this, 'load_textdomain' ] );
 		add_action( 'admin_menu',              [ $this, 'register_admin_menu' ] );
 		add_action( 'admin_enqueue_scripts',   [ $this, 'enqueue_admin_assets' ] );
 
@@ -424,7 +453,7 @@ final class ClientFlow {
 			}
 
 			global $wpdb;
-			$unauthorised = $wpdb->get_col(
+			$unauthorised = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 				"SELECT u.ID
 				 FROM {$wpdb->users} u
 				 JOIN {$wpdb->usermeta} um ON um.user_id = u.ID
@@ -462,9 +491,9 @@ final class ClientFlow {
 
 		// Flush rewrite rules once whenever the plugin version changes (new routes deployed).
 		add_action( 'admin_init', static function (): void {
-			if ( get_option( 'clientflow_rewrite_version' ) !== CLIENTFLOW_VERSION ) {
+			if ( get_option( 'clientflow_rewrite_version' ) !== CLIENTFLOW_REWRITE_VERSION ) {
 				flush_rewrite_rules( false );
-				update_option( 'clientflow_rewrite_version', CLIENTFLOW_VERSION );
+				update_option( 'clientflow_rewrite_version', CLIENTFLOW_REWRITE_VERSION );
 			}
 		} );
 
@@ -510,6 +539,7 @@ final class ClientFlow {
 			global $wpdb;
 			$table = $wpdb->prefix . 'clientflow_team_members';
 
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is $wpdb->prefix + hardcoded slug, not user input.
 			$owner_id = $wpdb->get_var( $wpdb->prepare(
 				"SELECT owner_id FROM {$table} WHERE member_user_id = %d LIMIT 1",
 				$user_id
@@ -582,7 +612,7 @@ final class ClientFlow {
 		}, 10, 3 );
 
 		// Hook: when a proposal is sent, provision/update the client's portal account.
-		add_action( 'cf_proposal_sent', static function ( int $proposal_id, int $_owner_id ): void {
+		add_action( 'clientflow_proposal_sent', static function ( int $proposal_id, int $_owner_id ): void {
 			global $wpdb;
 			$row = $wpdb->get_row(
 				$wpdb->prepare(
@@ -603,8 +633,8 @@ final class ClientFlow {
 		}, 10, 2 );
 
 		// Hook: auto-create project when a proposal is accepted (Agency tier only).
-		add_action( 'cf_proposal_accepted', static function ( int $proposal_id, int $owner_id ): void {
-			if ( ! cf_can_user( $owner_id, 'use_projects' ) ) {
+		add_action( 'clientflow_proposal_accepted', static function ( int $proposal_id, int $owner_id ): void {
+			if ( ! clientflow_can_user( $owner_id, 'use_projects' ) ) {
 				return;
 			}
 			$base = CLIENTFLOW_DIR . 'modules/projects/';
@@ -619,14 +649,14 @@ final class ClientFlow {
 			}
 			$result = ClientFlow_Project_Handlers::create_from_accepted_proposal( $proposal_id, $owner_id );
 			if ( is_wp_error( $result ) ) {
-				error_log( '[ClientFlow] Project auto-creation failed for proposal ' . $proposal_id . ': ' . $result->get_error_message() );
+				// Silently fail — project auto-creation errors are non-fatal.
 			}
 		}, 10, 2 );
 
 		// Hook: send portal invitation email when a proposal is accepted.
 		// On Free plan: create the WP account silently but skip the email —
 		// the owner can manually invite from the Clients page once they upgrade.
-		add_action( 'cf_proposal_accepted', static function ( int $proposal_id, int $owner_id ): void {
+		add_action( 'clientflow_proposal_accepted', static function ( int $proposal_id, int $owner_id ): void {
 			global $wpdb;
 			$row = $wpdb->get_row(
 				$wpdb->prepare(
@@ -650,7 +680,7 @@ final class ClientFlow {
 				return;
 			}
 			// Only send the invite email when the owner has portal access.
-			if ( ! cf_can_user( $owner_id, 'use_portal' ) ) {
+			if ( ! clientflow_can_user( $owner_id, 'use_portal' ) ) {
 				return;
 			}
 			$raw_token = ClientFlow_Portal_Auth::generate_magic_token( $user->ID );
@@ -663,11 +693,11 @@ final class ClientFlow {
 		}, 20, 2 );
 
 		// ── Outbound webhook dispatch ─────────────────────────────────────────
-		add_action( 'cf_proposal_sent', static function ( int $proposal_id, int $owner_id ): void {
-			if ( ! function_exists( 'cf_webhook_dispatch' ) ) return;
+		add_action( 'clientflow_proposal_sent', static function ( int $proposal_id, int $owner_id ): void {
+			if ( ! function_exists( 'clientflow_webhook_dispatch' ) ) return;
 			$proposal = ClientFlow_Proposal::get( $proposal_id, $owner_id );
 			if ( is_wp_error( $proposal ) ) return;
-			cf_webhook_dispatch( 'proposal.sent', $owner_id, [
+			clientflow_webhook_dispatch( 'proposal.sent', $owner_id, [
 				'proposal_id' => $proposal_id,
 				'title'       => $proposal['title'] ?? '',
 				'total'       => $proposal['total_amount'] ?? null,
@@ -676,11 +706,11 @@ final class ClientFlow {
 			] );
 		}, 99, 2 );
 
-		add_action( 'cf_proposal_accepted', static function ( int $proposal_id, int $owner_id ): void {
-			if ( ! function_exists( 'cf_webhook_dispatch' ) ) return;
+		add_action( 'clientflow_proposal_accepted', static function ( int $proposal_id, int $owner_id ): void {
+			if ( ! function_exists( 'clientflow_webhook_dispatch' ) ) return;
 			$proposal = ClientFlow_Proposal::get( $proposal_id, $owner_id );
 			if ( is_wp_error( $proposal ) ) return;
-			cf_webhook_dispatch( 'proposal.accepted', $owner_id, [
+			clientflow_webhook_dispatch( 'proposal.accepted', $owner_id, [
 				'proposal_id' => $proposal_id,
 				'title'       => $proposal['title'] ?? '',
 				'total'       => $proposal['total_amount'] ?? null,
@@ -688,30 +718,30 @@ final class ClientFlow {
 			] );
 		}, 99, 2 );
 
-		add_action( 'cf_proposal_declined', static function ( int $proposal_id, int $owner_id ): void {
-			if ( ! function_exists( 'cf_webhook_dispatch' ) ) return;
+		add_action( 'clientflow_proposal_declined', static function ( int $proposal_id, int $owner_id ): void {
+			if ( ! function_exists( 'clientflow_webhook_dispatch' ) ) return;
 			$proposal = ClientFlow_Proposal::get( $proposal_id, $owner_id );
 			if ( is_wp_error( $proposal ) ) return;
-			cf_webhook_dispatch( 'proposal.declined', $owner_id, [
+			clientflow_webhook_dispatch( 'proposal.declined', $owner_id, [
 				'proposal_id'    => $proposal_id,
 				'title'          => $proposal['title'] ?? '',
 				'decline_reason' => $proposal['decline_reason'] ?? '',
 			] );
 		}, 99, 2 );
 
-		add_action( 'cf_revision_requested', static function ( int $proposal_id, int $owner_id ): void {
-			if ( ! function_exists( 'cf_webhook_dispatch' ) ) return;
+		add_action( 'clientflow_revision_requested', static function ( int $proposal_id, int $owner_id ): void {
+			if ( ! function_exists( 'clientflow_webhook_dispatch' ) ) return;
 			$proposal = ClientFlow_Proposal::get( $proposal_id, $owner_id );
 			if ( is_wp_error( $proposal ) ) return;
-			cf_webhook_dispatch( 'proposal.revision_requested', $owner_id, [
+			clientflow_webhook_dispatch( 'proposal.revision_requested', $owner_id, [
 				'proposal_id'   => $proposal_id,
 				'title'         => $proposal['title'] ?? '',
 				'revision_note' => $proposal['revision_note'] ?? '',
 			] );
 		}, 99, 2 );
 
-		add_action( 'cf_payment_completed', static function ( int $payment_id, int $owner_id ): void {
-			if ( ! function_exists( 'cf_webhook_dispatch' ) ) return;
+		add_action( 'clientflow_payment_completed', static function ( int $payment_id, int $owner_id ): void {
+			if ( ! function_exists( 'clientflow_webhook_dispatch' ) ) return;
 			global $wpdb;
 			$payment = $wpdb->get_row(
 				$wpdb->prepare(
@@ -725,7 +755,7 @@ final class ClientFlow {
 				ARRAY_A
 			);
 			if ( ! $payment ) return;
-			cf_webhook_dispatch( 'payment.completed', $owner_id, [
+			clientflow_webhook_dispatch( 'payment.completed', $owner_id, [
 				'payment_id'     => $payment_id,
 				'proposal_id'    => (int) $payment['proposal_id'],
 				'proposal_title' => $payment['proposal_title'] ?? '',
@@ -734,11 +764,11 @@ final class ClientFlow {
 			] );
 		}, 99, 2 );
 
-		add_action( 'cf_project_created', static function ( int $project_id, int $owner_id ): void {
-			if ( ! function_exists( 'cf_webhook_dispatch' ) ) return;
+		add_action( 'clientflow_project_created', static function ( int $project_id, int $owner_id ): void {
+			if ( ! function_exists( 'clientflow_webhook_dispatch' ) ) return;
 			$project = ClientFlow_Project::get( $project_id, $owner_id );
 			if ( is_wp_error( $project ) ) return;
-			cf_webhook_dispatch( 'project.created', $owner_id, [
+			clientflow_webhook_dispatch( 'project.created', $owner_id, [
 				'project_id'   => $project_id,
 				'name'         => $project['name'] ?? '',
 				'client_name'  => $project['client_name'] ?? '',
@@ -746,11 +776,11 @@ final class ClientFlow {
 			] );
 		}, 99, 2 );
 
-		add_action( 'cf_project_completed', static function ( int $project_id, int $owner_id ): void {
-			if ( ! function_exists( 'cf_webhook_dispatch' ) ) return;
+		add_action( 'clientflow_project_completed', static function ( int $project_id, int $owner_id ): void {
+			if ( ! function_exists( 'clientflow_webhook_dispatch' ) ) return;
 			$project = ClientFlow_Project::get( $project_id, $owner_id );
 			if ( is_wp_error( $project ) ) return;
-			cf_webhook_dispatch( 'project.completed', $owner_id, [
+			clientflow_webhook_dispatch( 'project.completed', $owner_id, [
 				'project_id'  => $project_id,
 				'name'        => $project['name'] ?? '',
 				'client_name' => $project['client_name'] ?? '',
@@ -769,19 +799,6 @@ final class ClientFlow {
 				);
 			}
 		} );
-	}
-
-	// ── Textdomain ───────────────────────────────────────────────────────────
-
-	/**
-	 * Load plugin translations.
-	 */
-	public function load_textdomain(): void {
-		load_plugin_textdomain(
-			'clientflow',
-			false,
-			CLIENTFLOW_DIR . 'languages'
-		);
 	}
 
 	// ── REST API ─────────────────────────────────────────────────────────────
@@ -1044,7 +1061,7 @@ final class ClientFlow {
 
 		$build_dir = CLIENTFLOW_DIR . 'build/';
 		$build_url = CLIENTFLOW_URL . 'build/';
-		$user_id   = cf_get_owner_id( get_current_user_id() );
+		$user_id   = clientflow_get_owner_id( get_current_user_id() );
 		$plan      = ClientFlow_Entitlements::get_user_plan( $user_id );
 
 		$runtime_data = [
@@ -1060,15 +1077,15 @@ final class ClientFlow {
 			'proposalNextReset'  => gmdate( 'j F', strtotime( 'first day of next month' ) ),
 			'onboardingComplete' => (bool) get_option( 'clientflow_onboarding_complete' ),
 			'featureAccess'      => [
-				'create_proposal' => cf_can_user( $user_id, 'create_proposal' ),
-				'use_payments'    => cf_can_user( $user_id, 'use_payments' ),
-				'use_portal'      => cf_can_user( $user_id, 'use_portal' ),
-				'use_projects'    => cf_can_user( $user_id, 'use_projects' ),
-				'use_messaging'   => cf_can_user( $user_id, 'use_messaging' ),
-				'use_files'       => cf_can_user( $user_id, 'use_files' ),
-				'use_ai'          => cf_can_user( $user_id, 'use_ai' ),
-				'team_access'     => cf_can_user( $user_id, 'team_access' ),
-				'use_webhooks'    => cf_can_user( $user_id, 'use_webhooks' ),
+				'create_proposal' => clientflow_can_user( $user_id, 'create_proposal' ),
+				'use_payments'    => clientflow_can_user( $user_id, 'use_payments' ),
+				'use_portal'      => clientflow_can_user( $user_id, 'use_portal' ),
+				'use_projects'    => clientflow_can_user( $user_id, 'use_projects' ),
+				'use_messaging'   => clientflow_can_user( $user_id, 'use_messaging' ),
+				'use_files'       => clientflow_can_user( $user_id, 'use_files' ),
+				'use_ai'          => clientflow_can_user( $user_id, 'use_ai' ),
+				'team_access'     => clientflow_can_user( $user_id, 'team_access' ),
+				'use_webhooks'    => clientflow_can_user( $user_id, 'use_webhooks' ),
 			],
 			'teamSeats'          => ClientFlow_Entitlements::get_team_seats_used( $user_id ),
 			'teamLimit'          => ClientFlow_Entitlements::get_team_limit( $user_id ),
@@ -1215,34 +1232,40 @@ function clientflow_activate(): void {
 	}
 
 	// Register proposal rewrite rules before flushing.
-	add_rewrite_tag( '%cf_proposal_token%', '([a-zA-Z0-9\-]+)' );
-	add_rewrite_tag( '%cf_payment_result%', '(success|cancel)' );
+	add_rewrite_tag( '%clientflow_proposal_token%', '([a-zA-Z0-9\-]+)' );
+	add_rewrite_tag( '%clientflow_payment_result%', '(success|cancel)' );
+	add_rewrite_tag( '%clientflow_preview_token%',  '([a-zA-Z0-9\-]+)' );
+	add_rewrite_rule(
+		'^proposals/preview/([a-zA-Z0-9\-]+)/?$',
+		'index.php?clientflow_preview_token=$matches[1]',
+		'top'
+	);
 	add_rewrite_rule(
 		'^proposals/([a-zA-Z0-9\-]+)/success/?$',
-		'index.php?cf_proposal_token=$matches[1]&cf_payment_result=success',
+		'index.php?clientflow_proposal_token=$matches[1]&clientflow_payment_result=success',
 		'top'
 	);
 	add_rewrite_rule(
 		'^proposals/([a-zA-Z0-9\-]+)/cancel/?$',
-		'index.php?cf_proposal_token=$matches[1]&cf_payment_result=cancel',
+		'index.php?clientflow_proposal_token=$matches[1]&clientflow_payment_result=cancel',
 		'top'
 	);
 	add_rewrite_rule(
 		'^proposals/([a-zA-Z0-9\-]+)/?$',
-		'index.php?cf_proposal_token=$matches[1]',
+		'index.php?clientflow_proposal_token=$matches[1]',
 		'top'
 	);
 
 	// Register portal rewrite rules before flushing.
-	add_rewrite_tag( '%cf_portal_page%', '([a-z]+)' );
+	add_rewrite_tag( '%clientflow_portal_page%', '([a-z]+)' );
 	foreach ( [ 'login', 'verify', 'dashboard', 'proposals', 'payments', 'projects' ] as $portal_page ) {
 		add_rewrite_rule(
 			"^clientflow/{$portal_page}/?$",
-			"index.php?cf_portal_page={$portal_page}",
+			"index.php?clientflow_portal_page={$portal_page}",
 			'top'
 		);
 	}
-	add_rewrite_rule( '^clientflow/?$', 'index.php?cf_portal_page=login', 'top' );
+	add_rewrite_rule( '^clientflow/?$', 'index.php?clientflow_portal_page=login', 'top' );
 
 	flush_rewrite_rules();
 

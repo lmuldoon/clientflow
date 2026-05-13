@@ -15,6 +15,7 @@
  */
 
 declare( strict_types=1 );
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; all table variables use ->prefix with trusted constants, not user input.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -297,7 +298,7 @@ class ClientFlow_Proposal_Handlers {
 		);
 
 		foreach ( $expiring as $proposal ) {
-			$flag_key = 'cf_expiry_warned_' . $proposal->id;
+			$flag_key = 'clientflow_expiry_warned_' . $proposal->id;
 			if ( get_option( $flag_key ) ) {
 				continue;
 			}
@@ -308,12 +309,14 @@ class ClientFlow_Proposal_Handlers {
 			}
 
 			$days    = max( 1, (int) ceil( ( strtotime( $proposal->expiry_date ) - time() ) / DAY_IN_SECONDS ) );
+			/* translators: %d is the number of days until the proposal expires */
 			$day_str = $days === 1 ? __( '1 day', 'clientflow' ) : sprintf( __( '%d days', 'clientflow' ), $days );
 
 			wp_mail(
 				$client->user_email,
+				/* translators: %s is a human-readable time string like "3 days" */
 				sprintf( __( 'Your proposal expires in %s', 'clientflow' ), $day_str ),
-				cf_email_html( [
+				clientflow_email_html( [
 					'name'      => $client->display_name,
 					'body'      => '<p style="margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;">Your proposal <em>' . esc_html( $proposal->title ) . '</em> will expire in <strong style="color:#1A1A2E;">' . esc_html( $day_str ) . '</strong>. Please review and respond before it expires.</p>',
 					'cta_label' => __( 'Review Proposal', 'clientflow' ),
@@ -330,7 +333,7 @@ class ClientFlow_Proposal_Handlers {
 	 * Clear the expiry warning flag for a proposal (call on delete or manual expire).
 	 */
 	public static function clear_expiry_warning( int $proposal_id ): void {
-		delete_option( 'cf_expiry_warned_' . $proposal_id );
+		delete_option( 'clientflow_expiry_warned_' . $proposal_id );
 	}
 
 	// ── Private Helpers ───────────────────────────────────────────────────────
@@ -471,8 +474,10 @@ class ClientFlow_Proposal_Handlers {
 		if ( ! empty( trim( $email_subject ) ) ) {
 			$subject = sanitize_text_field( $email_subject );
 		} elseif ( ! empty( trim( $proposal['title'] ?? '' ) ) ) {
-			$subject = sprintf( __( 'Proposal Received: %s', 'clientflow' ), $proposal['title'] );
+			/* translators: %s is the proposal title */
+		$subject = sprintf( __( 'Proposal Received: %s', 'clientflow' ), $proposal['title'] );
 		} else {
+			/* translators: %s is the sender's display name */
 			$subject = sprintf( __( 'Proposal Received from %s', 'clientflow' ), $from_display );
 		}
 
@@ -488,7 +493,7 @@ class ClientFlow_Proposal_Handlers {
 				Click below to review the proposal and accept or decline.
 			</p>";
 
-		$message = cf_email_html( [
+		$message = clientflow_email_html( [
 			'subject'   => $subject,
 			'name'      => $proposal['client_name'] ?? '',
 			'body'      => $body_html,

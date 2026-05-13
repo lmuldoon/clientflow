@@ -20,6 +20,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class ClientFlow_Approval {
 
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; table() returns a trusted constant, not user input.
+
 	private const TABLE = 'clientflow_approvals';
 
 	/** Valid approval types. */
@@ -363,8 +365,9 @@ class ClientFlow_Approval {
 			: '<span style="color:#B91C1C;font-weight:600;">requested changes on</span>';
 		$desc         = esc_html( $row['description'] ?: $row['type'] );
 		$project_name = esc_html( $row['project_name'] );
-		$subject      = sprintf( __( 'Approval %s: %s — %s', 'clientflow' ), ucfirst( $status ), $row['type'], $row['project_name'] );
-		$body_html    = cf_email_html( [
+		/* translators: 1: approval status (e.g. "Approved"), 2: approval type, 3: project name */
+		$subject      = sprintf( __( 'Approval %1$s: %2$s — %3$s', 'clientflow' ), ucfirst( $status ), $row['type'], $row['project_name'] );
+		$body_html    = clientflow_email_html( [
 			'body'      => "<p style=\"margin:0 0 16px;font-size:16px;color:#6B7280;line-height:1.65;\"><strong style=\"color:#1A1A2E;\">{$client_name}</strong> has {$label_html} the approval request for <em>{$desc}</em> on project <strong style=\"color:#1A1A2E;\">{$project_name}</strong>.</p>",
 			'cta_label' => __( 'View Approval', 'clientflow' ),
 			'cta_url'   => admin_url( 'admin.php?page=clientflow-projects' ),
@@ -393,12 +396,10 @@ class ClientFlow_Approval {
 		);
 
 		if ( ! $row ) {
-			error_log( '[ClientFlow] notify_client: no DB row found for approval #' . $approval_id );
 			return;
 		}
 
 		if ( ! $row['client_email'] ) {
-			error_log( '[ClientFlow] notify_client: client has no email address (approval #' . $approval_id . ', project: ' . ( $row['project_name'] ?? 'unknown' ) . ')' );
 			return;
 		}
 
@@ -406,6 +407,7 @@ class ClientFlow_Approval {
 		$type_label   = esc_html( ucfirst( $row['type'] ) );
 		$description  = $row['description'] ? '<p style="margin:12px 0 0;font-size:14px;color:#6B7280;font-style:italic;">' . esc_html( $row['description'] ) . '</p>' : '';
 
+		/* translators: %s is the project name */
 		$subject  = sprintf( __( 'Action Required: Please review — %s', 'clientflow' ), $row['project_name'] );
 		$body_html = "
 			<p style=\"margin:0;font-size:16px;color:#6B7280;line-height:1.65;\">
@@ -419,7 +421,7 @@ class ClientFlow_Approval {
 				Please log in to your portal to review and respond.
 			</p>";
 
-		$message = cf_email_html( [
+		$message = clientflow_email_html( [
 			'name'      => $row['client_name'] ?: '',
 			'body'      => $body_html,
 			'cta_label' => __( 'Review & Respond', 'clientflow' ),
@@ -428,8 +430,6 @@ class ClientFlow_Approval {
 
 		$sent = wp_mail( $row['client_email'], $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
 
-		if ( ! $sent ) {
-			error_log( '[ClientFlow] notify_client: wp_mail() returned false for approval #' . $approval_id . ' → ' . $row['client_email'] );
-		}
+		unset( $sent );
 	}
 }

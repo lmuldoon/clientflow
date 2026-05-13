@@ -21,6 +21,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class ClientFlow_File {
 
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Custom table queries; table() returns a trusted constant, not user input.
+
 	private const TABLE         = 'clientflow_files';
 	private const STORAGE_LIMIT_MB = 1024; // 1 GB
 
@@ -46,7 +48,7 @@ class ClientFlow_File {
 	public static function upload( int $project_id, int $owner_id, array $wp_file ): int|WP_Error {
 		global $wpdb;
 
-		if ( ! cf_can_user( $owner_id, 'use_files' ) ) {
+		if ( ! clientflow_can_user( $owner_id, 'use_files' ) ) {
 			return new WP_Error(
 				'unauthorized',
 				__( 'File sharing is available on Agency plan.', 'clientflow' ),
@@ -364,7 +366,7 @@ class ClientFlow_File {
 		header( 'Content-Length: ' . filesize( $abs_path ) );
 		header( 'Cache-Control: no-store' );
 
-		readfile( $abs_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_readfile
+		readfile( $abs_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- direct output for file download, WP_Filesystem is not suitable here.
 		exit;
 	}
 
