@@ -536,7 +536,7 @@ $cf_is_free         = ! clientflow_can_user( $cf_owner_id, 'use_testimonials' );
 							<path d="M7 11V7a5 5 0 0110 0v4"/>
 						</svg>
 						<p style="margin:0;font-size:13px;font-weight:600;color:#1A1A2E;"><?php esc_html_e( 'Available on Pro &amp; Agency plans', 'clientflow' ); ?></p>
-						<a href="https://clientflow.io/pricing" target="_blank" rel="noopener" style="display:inline-block;padding:7px 18px;background:#6366F1;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;"><?php esc_html_e( 'Upgrade', 'clientflow' ); ?></a>
+						<a href="https://wpclientflow.co.uk/pricing" target="_blank" rel="noopener" style="display:inline-block;padding:7px 18px;background:#6366F1;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;"><?php esc_html_e( 'Upgrade', 'clientflow' ); ?></a>
 					</div>
 					<?php endif; ?>
 
@@ -607,7 +607,7 @@ $cf_is_free         = ! clientflow_can_user( $cf_owner_id, 'use_testimonials' );
 							<path d="M7 11V7a5 5 0 0110 0v4"/>
 						</svg>
 						<p style="margin:0;font-size:13px;font-weight:600;color:#1A1A2E;"><?php esc_html_e( 'Available on Pro &amp; Agency plans', 'clientflow' ); ?></p>
-						<a href="https://clientflow.io/pricing" target="_blank" rel="noopener" style="display:inline-block;padding:7px 18px;background:#6366F1;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;"><?php esc_html_e( 'Upgrade', 'clientflow' ); ?></a>
+						<a href="https://wpclientflow.co.uk/pricing" target="_blank" rel="noopener" style="display:inline-block;padding:7px 18px;background:#6366F1;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;"><?php esc_html_e( 'Upgrade', 'clientflow' ); ?></a>
 					</div>
 					<?php endif; ?>
 
@@ -677,7 +677,7 @@ $cf_is_free         = ! clientflow_can_user( $cf_owner_id, 'use_testimonials' );
 							<path d="M7 11V7a5 5 0 0110 0v4"/>
 						</svg>
 						<p style="margin:0;font-size:13px;font-weight:600;color:#1A1A2E;"><?php esc_html_e( 'Available on Pro &amp; Agency plans', 'clientflow' ); ?></p>
-						<a href="https://clientflow.io/pricing" target="_blank" rel="noopener" style="display:inline-block;padding:7px 18px;background:#6366F1;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;"><?php esc_html_e( 'Upgrade', 'clientflow' ); ?></a>
+						<a href="https://wpclientflow.co.uk/pricing" target="_blank" rel="noopener" style="display:inline-block;padding:7px 18px;background:#6366F1;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;"><?php esc_html_e( 'Upgrade', 'clientflow' ); ?></a>
 					</div>
 					<?php endif; ?>
 

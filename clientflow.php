@@ -2,7 +2,7 @@
 /**
  * Plugin Name: ClientFlow
  * Plugin URI:  https://wpclientflow.co.uk
- * Description: Professional proposal, payment, and client management for freelancers and agencies.
+ * Description: All-in-one client workflow management for WordPress — proposals, payments, projects, and client portals.
  * Version:     0.1.2
  * Author:      Codievolt
  * Author URI:  https://codievolt.com

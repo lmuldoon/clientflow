@@ -129,7 +129,7 @@ $features = [
 ];
 
 // Upgrade CTA target — use Freemius pricing page.
-$upgrade_url = function_exists( 'clientflow_fs' ) ? clientflow_fs()->get_upgrade_url() : 'https://clientflow.io/pricing';
+$upgrade_url = function_exists( 'clientflow_fs' ) ? clientflow_fs()->get_upgrade_url() : 'https://wpclientflow.co.uk/pricing';
 ?>
 
 <style>
