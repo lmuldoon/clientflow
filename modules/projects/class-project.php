@@ -303,6 +303,12 @@ class ClientFlow_Project {
 			[ '%d', '%d' ]
 		);
 
+		// Hard-delete all uploaded files to free disk space and storage quota.
+		if ( ! class_exists( 'ClientFlow_File' ) ) {
+			require_once CLIENTFLOW_DIR . 'modules/files/class-file.php';
+		}
+		ClientFlow_File::delete_for_project( $id, $owner_id );
+
 		// Remove child milestones so they don't orphan in the milestones table.
 		$wpdb->delete(
 			$wpdb->prefix . 'clientflow_milestones',

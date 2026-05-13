@@ -50,7 +50,7 @@ const PAGE_CSS = `
 .cfv-page {
 	min-height: 100vh;
 	background: #F8F7F5;
-	padding-bottom: 100px;
+	padding-bottom: 50px;
 }
 
 /* ── Document card ────────────────────────────────────────────── */
@@ -260,14 +260,174 @@ const PAGE_CSS = `
 	.cfv-loading__head { padding: 28px 24px; }
 }
 
+/* ── Powered-by footer ───────────────────────────────────────── */
+.cfv-powered {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 7px;
+	padding: 28px 0 36px;
+	font-family: 'DM Sans', sans-serif;
+	font-size: 12px;
+	color: #C4C9D4;
+	letter-spacing: .01em;
+	user-select: none;
+}
+.cfv-powered__logo {
+	height: 16px;
+	width: auto;
+	opacity: 0.3;
+	filter: grayscale(1);
+	display: block;
+}
+
 /* ── Print ───────────────────────────────────────────────────── */
 @media print {
-	.cfv-page  { background: #fff; padding: 0; }
-	.cfv-doc   { box-shadow: none; min-height: auto; }
-	.cfv-body  { padding: 24px 32px 40px; }
-	.cfv-toasts { display: none; }
+	.cfv-page    { background: #fff; padding: 0; }
+	.cfv-doc     { box-shadow: none; min-height: auto; }
+	.cfv-body    { padding: 24px 32px 40px; }
+	.cfv-toasts  { display: none; }
+	.cfv-powered { display: none; }
 }
 `;
+
+/* ── Preview banner ───────────────────────────────────────────── */
+
+const PREVIEW_BANNER_CSS = `
+.cfv-preview-banner {
+	position: sticky;
+	top: 0;
+	z-index: 300;
+	background: #0F172A;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 10px 24px;
+	gap: 16px;
+	font-family: 'DM Sans', sans-serif;
+}
+.cfv-preview-banner__left {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.cfv-preview-banner__icon {
+	flex-shrink: 0;
+	color: rgba(255,255,255,0.75);
+	display: flex;
+	align-items: center;
+}
+.cfv-preview-banner__label {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+.cfv-preview-banner__label strong {
+	font-size: 13px;
+	font-weight: 700;
+	color: rgba(255,255,255,0.9);
+	letter-spacing: .02em;
+}
+.cfv-preview-banner__label span {
+	font-size: 11.5px;
+	color: rgba(255,255,255,0.7);
+}
+.cfv-preview-banner__copy {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 14px;
+	border-radius: 6px;
+	background: #6666F1;
+	color: #FFFFFF;
+	font-size: 12px;
+	font-weight: 600;
+	font-family: 'DM Sans', sans-serif;
+	cursor: pointer;
+	transition: background .15s, border-color .15s;
+	white-space: nowrap;
+	flex-shrink: 0;
+	border:none;
+}
+.cfv-preview-banner__copy:hover:not(:disabled) {
+	background:#4F46E5;
+}
+.cfv-preview-banner__copy.copied {
+	background: #4F46E5;
+	color: #FFFFFF;
+}
+@media print { .cfv-preview-banner { display: none; } }
+`;
+
+function PreviewBanner() {
+	const { useState: useLocalState } = wp.element;
+	const [ copied, setCopied ]   = useLocalState( false );
+	const [ copying, setCopying ] = useLocalState( false );
+
+	async function handleCopy() {
+		setCopying( true );
+		try {
+			await navigator.clipboard.writeText( window.location.href );
+			setCopied( true );
+			setTimeout( () => setCopied( false ), 2500 );
+		} catch {
+			// Fallback: select a temporary input
+			const inp = document.createElement( 'input' );
+			inp.value = window.location.href;
+			document.body.appendChild( inp );
+			inp.select();
+			document.execCommand( 'copy' );
+			document.body.removeChild( inp );
+			setCopied( true );
+			setTimeout( () => setCopied( false ), 2500 );
+		} finally {
+			setCopying( false );
+		}
+	}
+
+	injectStyles( 'cfv-preview-banner-s', PREVIEW_BANNER_CSS );
+
+	return (
+		<div className="cfv-preview-banner" role="alert" aria-live="polite">
+			<div className="cfv-preview-banner__left">
+				<span className="cfv-preview-banner__icon">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+						<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+						<circle cx="12" cy="12" r="3"/>
+					</svg>
+				</span>
+				<div className="cfv-preview-banner__label">
+					<strong>Internal Preview</strong>
+					<span>This link is for internal review only — the client cannot see it</span>
+				</div>
+			</div>
+			<button
+				type="button"
+				className={ `cfv-preview-banner__copy${ copied ? ' copied' : '' }` }
+				onClick={ handleCopy }
+				disabled={ copying }
+				aria-label="Copy preview link to clipboard"
+			>
+				{ copied ? (
+					<>
+						<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+							<polyline points="20 6 9 17 4 12"/>
+						</svg>
+						Copied!
+					</>
+				) : (
+					<>
+						<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+							<rect x="9" y="9" width="13" height="13" rx="2"/>
+							<path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+						</svg>
+						Copy Link
+					</>
+				) }
+			</button>
+		</div>
+	);
+}
 
 /* ── Sub-components ───────────────────────────────────────────── */
 
@@ -327,13 +487,15 @@ async function apiFetch( path, opts = {} ) {
 }
 
 /* ── Main component ───────────────────────────────────────────── */
-export default function ProposalClientView() {
+export default function ProposalClientView( { isPreview = false } = {} ) {
 	injectStyles( 'cf-global-s',  GLOBAL_CSS );
 	injectStyles( 'cf-page-s',    PAGE_CSS );
 
-	const token        = ( window.cfClientData || {} ).token || '';
-	const businessName = ( window.cfClientData || {} ).businessName || '';
-	const businessLogo = ( window.cfClientData || {} ).businessLogo || '';
+	const cfData       = window.cfClientData || {};
+	const token        = cfData.token        || '';
+	const businessName = cfData.businessName || '';
+	const businessLogo = cfData.businessLogo || '';
+	const pluginLogoUrl = cfData.pluginLogoUrl || '';
 
 	const [ loadState,      setLoadState     ] = useState( 'loading' ); // 'loading' | 'loaded' | 'error'
 	const [ proposal,       setProposal      ] = useState( null );
@@ -357,14 +519,17 @@ export default function ProposalClientView() {
 			setErrorMsg( 'Invalid proposal link.' );
 			return;
 		}
-		apiFetch( `client/proposals/${ token }` )
+		const path = isPreview
+			? `client/proposals/preview/${ token }`
+			: `client/proposals/${ token }`;
+		apiFetch( path )
 			.then( data => { setProposal( data.proposal ); setLoadState( 'loaded' ); } )
 			.catch( err => { setLoadState( 'error' ); setErrorMsg( err.message ); } );
 	}, [ token ] );
 
-	/* Track view — fires once after proposal loads */
+	/* Track view — fires once after proposal loads; skipped in preview mode */
 	useEffect( () => {
-		if ( loadState !== 'loaded' || viewTracked.current ) return;
+		if ( isPreview || loadState !== 'loaded' || viewTracked.current ) return;
 		viewTracked.current = true;
 		apiFetch( `client/proposals/${ token }/view`, { method: 'POST' } ).catch( () => {} );
 	}, [ loadState ] );
@@ -455,6 +620,7 @@ export default function ProposalClientView() {
 
 	return (
 		<div className="cfv-page">
+			{ isPreview && <PreviewBanner /> }
 			<div className="cfv-doc">
 				<ClientProposalHeader
 					proposal={ proposal }
@@ -514,7 +680,7 @@ export default function ProposalClientView() {
 				</div>
 			) }
 
-			{ ! isExpired && (
+			{ ! isExpired && ! isPreview && (
 				<ClientActionButtons
 					status={ proposal.status }
 					paymentEnabled={ proposal.payment_enabled }
@@ -535,6 +701,17 @@ export default function ProposalClientView() {
 					onClose={ () => setShowPayment( false ) }
 				/>
 			) }
+
+			<div className="cfv-powered" aria-hidden="true">
+				Powered by
+				{ pluginLogoUrl && (
+					<img
+						src={ pluginLogoUrl }
+						alt="ClientFlow"
+						className="cfv-powered__logo"
+					/>
+				) }
+			</div>
 
 			<Toasts toasts={ toasts } />
 		</div>

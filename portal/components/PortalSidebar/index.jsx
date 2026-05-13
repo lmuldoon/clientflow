@@ -72,6 +72,23 @@ injectStyles( 'cps-s', `
 	object-fit: contain;
 }
 
+.cps-logo-wrap.cps-logo-wrap--image {
+	width: auto;
+	max-width: 120px;
+	background: transparent;
+	border: none;
+	border-radius: 0;
+	overflow: visible;
+}
+
+.cps-logo-wrap.cps-logo-wrap--image img {
+	width: auto;
+	height: 100%;
+	max-height: 40px;
+	max-width: 120px;
+	object-fit: contain;
+}
+
 .cps-logo-initials {
 	font-family: 'Playfair Display', serif;
 	font-size: 15px;
@@ -461,7 +478,7 @@ export default function PortalSidebar( { page } ) {
 			{ /* ── Branding ── */ }
 			<div className="cps-brand" style={ { background: brandBg } }>
 				<div className="cps-brand-overlay" />
-				<div className="cps-logo-wrap">
+				<div className={ `cps-logo-wrap${ businessLogo ? ' cps-logo-wrap--image' : '' }` }>
 					{ businessLogo
 						? <img src={ businessLogo } alt={ businessName } />
 						: <span className="cps-logo-initials">{ initials }</span>

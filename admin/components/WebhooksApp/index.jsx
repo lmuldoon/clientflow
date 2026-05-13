@@ -66,7 +66,7 @@ const WH_CSS = `
   border: none; outline: none;
 }
 .cf-wh-btn--primary {
-  background: var(--cf-indigo); color: #fff;
+  background: var(--cf-indigo); color: #fff !important; 
   box-shadow: 0 2px 8px rgba(99,102,241,.3);
 }
 .cf-wh-btn--primary:hover { background: #4F46E5; transform: translateY(-1px); }
@@ -242,7 +242,7 @@ function Toggle( { on, onChange, label } ) {
 	);
 }
 
-function EventCheckboxes( { selected, onChange } ) {
+function EventCheckboxes( { selected, onChange, availableEvents } ) {
 	const toggle = ( value ) => {
 		onChange( selected.includes( value )
 			? selected.filter( v => v !== value )
@@ -251,7 +251,7 @@ function EventCheckboxes( { selected, onChange } ) {
 	};
 	return (
 		<div className="cf-wh-events">
-			{ ALL_EVENTS.map( ev => (
+			{ availableEvents.map( ev => (
 				<label key={ ev.value } className={ `cf-wh-event-label${ selected.includes( ev.value ) ? ' cf-wh-event-label--on' : '' }` }>
 					<input type="checkbox" checked={ selected.includes( ev.value ) } onChange={ () => toggle( ev.value ) } />
 					{ ev.label }
@@ -274,7 +274,7 @@ function LogRow( { log } ) {
 	);
 }
 
-function WebhookForm( { initial, onSave, onCancel, saving } ) {
+function WebhookForm( { initial, onSave, onCancel, saving, availableEvents } ) {
 	const [ url, setUrl ]       = useState( initial?.url || '' );
 	const [ events, setEvents ] = useState( initial?.events || [] );
 	const [ error, setError ]   = useState( '' );
@@ -305,7 +305,7 @@ function WebhookForm( { initial, onSave, onCancel, saving } ) {
 
 			<div className="cf-wh-field">
 				<label className="cf-wh-label">Events</label>
-				<EventCheckboxes selected={ events } onChange={ setEvents } />
+				<EventCheckboxes selected={ events } onChange={ setEvents } availableEvents={ availableEvents } />
 			</div>
 
 			{ error && <p className="cf-wh-error-text">{ error }</p> }
@@ -320,7 +320,7 @@ function WebhookForm( { initial, onSave, onCancel, saving } ) {
 	);
 }
 
-function WebhookCard( { webhook, onUpdate, onDelete } ) {
+function WebhookCard( { webhook, onUpdate, onDelete, availableEvents } ) {
 	const [ testState, setTestState ]   = useState( null ); // null | 'loading' | {ok, msg}
 	const [ toggling, setToggling ]     = useState( false );
 	const [ editing, setEditing ]       = useState( false );
@@ -380,6 +380,7 @@ function WebhookCard( { webhook, onUpdate, onDelete } ) {
 				onSave={ handleSave }
 				onCancel={ () => setEditing( false ) }
 				saving={ saving }
+				availableEvents={ availableEvents }
 			/>
 		);
 	}
@@ -438,7 +439,9 @@ function WebhookCard( { webhook, onUpdate, onDelete } ) {
 
 export default function WebhooksApp() {
 	const { featureAccess = {}, userPlan = 'free' } = window.cfData || {};
-	const canUse = featureAccess.use_webhooks;
+	const canUse    = featureAccess.use_webhooks;
+	const hasProjects = featureAccess.use_projects;
+	const EVENTS    = ALL_EVENTS.filter( ev => hasProjects || ! ev.value.startsWith( 'project.' ) );
 
 	const [ webhooks, setWebhooks ] = useState( [] );
 	const [ loading, setLoading ]   = useState( true );
@@ -548,6 +551,7 @@ export default function WebhooksApp() {
 					onSave={ handleCreate }
 					onCancel={ () => setAdding( false ) }
 					saving={ saving }
+					availableEvents={ EVENTS }
 				/>
 			) }
 
@@ -569,6 +573,7 @@ export default function WebhooksApp() {
 						webhook={ wh }
 						onUpdate={ handleUpdate }
 						onDelete={ handleDelete }
+						availableEvents={ EVENTS }
 					/>
 				) )
 			) }

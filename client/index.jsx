@@ -37,6 +37,8 @@ if ( root ) {
 		render( <PaymentSuccess token={ token } sessionId={ sessionId } />, root );
 	} else if ( pageType === 'cancel' ) {
 		render( <PaymentCancelled token={ token } />, root );
+	} else if ( pageType === 'preview' ) {
+		render( <ProposalClientView isPreview={ true } />, root );
 	} else {
 		render( <ProposalClientView />, root );
 	}

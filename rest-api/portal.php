@@ -392,6 +392,6 @@ function cf_portal_get_receipt( WP_REST_Request $request ): WP_REST_Response {
 		'client_name'   => $user->display_name,
 		'client_email'  => $user->user_email,
 		'business_name' => get_option( 'clientflow_business_name' ) ?: get_option( 'blogname' ),
-		'business_logo' => get_option( 'clientflow_business_logo' ),
+		'business_logo' => get_option( 'clientflow_logo_url', '' ),
 	], 200 );
 }

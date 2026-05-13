@@ -74,6 +74,22 @@ injectStyles( 'cpl-s', `
 	object-fit: contain;
 }
 
+.cpl-logo-wrap.cpl-logo-wrap--image {
+	width: auto;
+	max-width: 200px;
+	height: 60px;
+	background: transparent;
+	border: none;
+	border-radius: 0;
+	backdrop-filter: none;
+}
+
+.cpl-logo-wrap.cpl-logo-wrap--image img {
+	max-width: 200px;
+	max-height: 60px;
+	object-fit: contain;
+}
+
 .cpl-logo-initials {
 	font-family: 'Playfair Display', serif;
 	font-size: 28px;
@@ -501,7 +517,7 @@ export default function PortalLogin() {
 			<div className="cpl-brand-deco cpl-brand-deco-1" />
 			<div className="cpl-brand-deco cpl-brand-deco-2" />
 			<div className="cpl-brand-inner">
-				<div className="cpl-logo-wrap">
+				<div className={ `cpl-logo-wrap${ businessLogo ? ' cpl-logo-wrap--image' : '' }` }>
 					{ businessLogo
 						? <img src={ businessLogo } alt={ businessName } />
 						: <span className="cpl-logo-initials">{ initials }</span>

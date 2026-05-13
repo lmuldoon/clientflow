@@ -41,3 +41,5 @@ yarn.lock
 # Ignore only local data and distribution artefacts.
 freemius/data/
 *.zip
+
+tests/

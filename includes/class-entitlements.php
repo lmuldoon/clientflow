@@ -117,6 +117,13 @@ class ClientFlow_Entitlements {
 				'agency' => [ 'limit' => 1000, 'limit_type' => 'mb' ],
 			],
 
+			// ── Testimonial Emails ────────────────────────────────────────────
+			'use_testimonials' => [
+				'free'   => false,
+				'pro'    => true,
+				'agency' => true,
+			],
+
 			// ── Team Seats ────────────────────────────────────────────────────
 			'team_access' => [
 				'free'   => [ 'limit' => 1, 'limit_type' => 'users' ],
@@ -403,6 +410,27 @@ class ClientFlow_Entitlements {
 			'agency' => 5,
 			default  => 1,
 		};
+	}
+
+	/**
+	 * Check whether a plan includes a feature at all, ignoring runtime usage limits.
+	 *
+	 * Use this for display/UI purposes. Use can_user() for actual access gates.
+	 *
+	 * @param int    $user_id
+	 * @param string $feature
+	 *
+	 * @return bool True if the plan matrix entry is not false.
+	 */
+	public static function plan_includes_feature( int $user_id, string $feature ): bool {
+		$plan   = self::get_user_plan( $user_id );
+		$matrix = self::get_feature_matrix();
+
+		if ( ! isset( $matrix[ $feature ][ $plan ] ) ) {
+			return false;
+		}
+
+		return false !== $matrix[ $feature ][ $plan ];
 	}
 
 	/**

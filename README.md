@@ -10,7 +10,7 @@ ClientFlow gives freelancers and agencies everything they need to send proposals
 
 | Feature | Free | Pro | Agency |
 |---|---|---|---|
-| Proposals | 5 lifetime | Unlimited | Unlimited |
+| Proposals | 3 proposals per month | Unlimited | Unlimited |
 | Clients | ✓ | ✓ | ✓ |
 | Client Portal | — | ✓ | ✓ |
 | Stripe Payments | — | ✓ | ✓ |

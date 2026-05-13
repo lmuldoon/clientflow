@@ -149,6 +149,22 @@ add_action( 'rest_api_init', static function (): void {
 		'permission_callback' => 'cf_rest_require_auth',
 		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
 	] );
+
+	// ── POST /proposals/{id}/preview-token ───────────────────────────────────
+	register_rest_route( $ns, '/proposals/(?P<id>\d+)/preview-token', [
+		'methods'             => WP_REST_Server::CREATABLE,
+		'callback'            => 'cf_rest_generate_preview_token',
+		'permission_callback' => 'cf_rest_require_auth',
+		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
+	] );
+
+	// ── DELETE /proposals/{id}/preview-token ─────────────────────────────────
+	register_rest_route( $ns, '/proposals/(?P<id>\d+)/preview-token', [
+		'methods'             => WP_REST_Server::DELETABLE,
+		'callback'            => 'cf_rest_revoke_preview_token',
+		'permission_callback' => 'cf_rest_require_auth',
+		'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
+	] );
 } );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -353,6 +369,20 @@ function cf_rest_update_proposal( WP_REST_Request $request ): WP_REST_Response|W
 		return new WP_REST_Response( [ 'updated' => true, 'id' => $id ], 200 );
 	}
 
+	// Fire testimonial email when a proposal is marked complete with no linked project
+	// (Agency users complete proposals through the project; this covers Pro plan users).
+	if ( isset( $data['status'] ) && 'completed' === $data['status'] ) {
+		$has_project = (bool) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}clientflow_projects WHERE proposal_id = %d LIMIT 1",
+				$id
+			)
+		);
+		if ( ! $has_project && function_exists( 'cf_maybe_send_testimonial_email' ) ) {
+			cf_maybe_send_testimonial_email( [ 'proposal_id' => $id ], $user_id );
+		}
+	}
+
 	return new WP_REST_Response( [ 'proposal' => $proposal ], 200 );
 }
 
@@ -440,4 +470,43 @@ function cf_rest_delete_proposal( WP_REST_Request $request ): WP_REST_Response|W
 	}
 
 	return new WP_REST_Response( [ 'deleted' => true, 'id' => $id ], 200 );
+}
+
+/**
+ * POST /clientflow/v1/proposals/{id}/preview-token
+ *
+ * Generate (or regenerate) a shareable preview link for a proposal.
+ * The preview URL is read-only — no client actions are available on it.
+ */
+function cf_rest_generate_preview_token( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = cf_get_owner_id( get_current_user_id() );
+	$id      = (int) $request->get_param( 'id' );
+
+	$token = ClientFlow_Proposal::generate_preview_token( $id, $user_id );
+
+	if ( is_wp_error( $token ) ) {
+		return $token;
+	}
+
+	$preview_url = home_url( "/proposals/preview/{$token}" );
+
+	return new WP_REST_Response( [ 'preview_token' => $token, 'preview_url' => $preview_url ], 200 );
+}
+
+/**
+ * DELETE /clientflow/v1/proposals/{id}/preview-token
+ *
+ * Revoke the preview token — the preview URL immediately becomes invalid.
+ */
+function cf_rest_revoke_preview_token( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$user_id = cf_get_owner_id( get_current_user_id() );
+	$id      = (int) $request->get_param( 'id' );
+
+	$result = ClientFlow_Proposal::revoke_preview_token( $id, $user_id );
+
+	if ( is_wp_error( $result ) ) {
+		return $result;
+	}
+
+	return new WP_REST_Response( [ 'revoked' => true ], 200 );
 }

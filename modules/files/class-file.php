@@ -239,40 +239,68 @@ class ClientFlow_File {
 	public static function delete( int $id, int $owner_id ): true|WP_Error {
 		global $wpdb;
 
-		$file = self::get( $id, $owner_id );
-		if ( is_wp_error( $file ) ) {
-			return $file;
+		// Raw query — we need file_url which prepare_row() strips from the public getter.
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT f.* FROM " . self::table() . " f
+				 INNER JOIN {$wpdb->prefix}clientflow_projects p ON f.project_id = p.id
+				 WHERE f.id = %d AND p.owner_id = %d",
+				$id,
+				$owner_id
+			),
+			ARRAY_A
+		);
+
+		if ( ! $row ) {
+			return new WP_Error( 'file_not_found', __( 'File not found.', 'clientflow' ), [ 'status' => 404 ] );
 		}
 
-		// Remove from disk.
-		$upload_dir = wp_upload_dir();
-		$base       = $upload_dir['basedir'];
-		$base_url   = $upload_dir['baseurl'];
-		$rel        = str_replace( $base_url, '', $file['file_url'] );
-		$abs_path   = $base . $rel;
-
-		if ( file_exists( $abs_path ) ) {
-			wp_delete_file( $abs_path );
-		}
+		self::delete_from_disk( $row['file_url'] );
 
 		$wpdb->delete( self::table(), [ 'id' => $id ], [ '%d' ] );
 
-		// Decrement storage.
-		$file_mb = (int) ceil( ( $file['file_size_kb'] * 1024 ) / ( 1024 * 1024 ) );
-		$now     = current_time( 'mysql' );
+		self::decrement_storage( $owner_id, (int) $row['file_size_kb'] );
+
+		return true;
+	}
+
+	/**
+	 * Hard-delete all files for a project — used when a project is deleted.
+	 *
+	 * Removes each file from disk, purges all DB rows in one query, and
+	 * decrements the owner's storage counter by the total freed space.
+	 *
+	 * @param int $project_id
+	 * @param int $owner_id
+	 */
+	public static function delete_for_project( int $project_id, int $owner_id ): void {
+		global $wpdb;
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT file_url, file_size_kb FROM " . self::table() . " WHERE project_id = %d",
+				$project_id
+			),
+			ARRAY_A
+		);
+
+		if ( empty( $rows ) ) {
+			return;
+		}
+
+		foreach ( $rows as $row ) {
+			self::delete_from_disk( $row['file_url'] );
+		}
 
 		$wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$wpdb->prefix}clientflow_user_meta
-				 SET storage_used_mb = GREATEST(0, storage_used_mb - %d), updated_at = %s
-				 WHERE user_id = %d",
-				$file_mb,
-				$now,
-				$owner_id
+				"DELETE FROM " . self::table() . " WHERE project_id = %d",
+				$project_id
 			)
 		);
 
-		return true;
+		$total_kb = (int) array_sum( array_column( $rows, 'file_size_kb' ) );
+		self::decrement_storage( $owner_id, $total_kb );
 	}
 
 	// ── Stream ────────────────────────────────────────────────────────────────
@@ -405,5 +433,29 @@ class ClientFlow_File {
 		);
 
 		return $count > 0;
+	}
+
+	private static function delete_from_disk( string $file_url ): void {
+		$upload_dir = wp_upload_dir();
+		$rel        = str_replace( $upload_dir['baseurl'], '', $file_url );
+		$abs_path   = $upload_dir['basedir'] . $rel;
+		if ( file_exists( $abs_path ) ) {
+			wp_delete_file( $abs_path );
+		}
+	}
+
+	private static function decrement_storage( int $owner_id, int $file_size_kb ): void {
+		global $wpdb;
+		$file_mb = (int) ceil( ( $file_size_kb * 1024 ) / ( 1024 * 1024 ) );
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$wpdb->prefix}clientflow_user_meta
+				 SET storage_used_mb = GREATEST(0, storage_used_mb - %d), updated_at = %s
+				 WHERE user_id = %d",
+				$file_mb,
+				current_time( 'mysql' ),
+				$owner_id
+			)
+		);
 	}
 }

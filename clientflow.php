@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: Clientflow
+ * Plugin Name: ClientFlow
  * Plugin URI:  https://wpclientflow.co.uk
  * Description: Professional proposal, payment, and client management for freelancers and agencies.
  * Version:     0.1.2
@@ -825,12 +825,10 @@ final class ClientFlow {
 	 * Register the top-level admin menu and sub-pages.
 	 */
 	public function register_admin_menu(): void {
-		// SVG icon (indigo checkmark circle).
-		$svg_icon = 'data:image/svg+xml;base64,' . base64_encode(
-			'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '
-			. 'stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-			. '<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
-		);
+		$svg_raw  = file_get_contents( CLIENTFLOW_DIR . 'assets/images/logo-icon.svg' );
+		$svg_raw  = preg_replace( '/^<\?xml[^?]*\?>\s*/s', '', $svg_raw );
+		$svg_raw  = preg_replace( '/<svg\b/', '<svg fill="#a7aaad"', $svg_raw, 1 );
+		$svg_icon = 'data:image/svg+xml;base64,' . base64_encode( $svg_raw );
 
 		add_menu_page(
 			__( 'ClientFlow', 'clientflow' ),
@@ -963,14 +961,14 @@ final class ClientFlow {
 		];
 
 		$feature_access = [
-			'create_proposal' => cf_can_user( $user_id, 'create_proposal' ),
-			'use_payments'    => cf_can_user( $user_id, 'use_payments' ),
-			'use_portal'      => cf_can_user( $user_id, 'use_portal' ),
-			'use_projects'    => cf_can_user( $user_id, 'use_projects' ),
-			'use_messaging'   => cf_can_user( $user_id, 'use_messaging' ),
-			'use_files'       => cf_can_user( $user_id, 'use_files' ),
-			'use_ai'          => cf_can_user( $user_id, 'use_ai' ),
-			'team_access'     => cf_can_user( $user_id, 'team_access' ),
+			'create_proposal' => ClientFlow_Entitlements::plan_includes_feature( $user_id, 'create_proposal' ),
+			'use_payments'    => ClientFlow_Entitlements::plan_includes_feature( $user_id, 'use_payments' ),
+			'use_portal'      => ClientFlow_Entitlements::plan_includes_feature( $user_id, 'use_portal' ),
+			'use_projects'    => ClientFlow_Entitlements::plan_includes_feature( $user_id, 'use_projects' ),
+			'use_messaging'   => ClientFlow_Entitlements::plan_includes_feature( $user_id, 'use_messaging' ),
+			'use_files'       => ClientFlow_Entitlements::plan_includes_feature( $user_id, 'use_files' ),
+			'use_ai'          => ClientFlow_Entitlements::plan_includes_feature( $user_id, 'use_ai' ),
+			'team_access'     => ClientFlow_Entitlements::plan_includes_feature( $user_id, 'team_access' ),
 		];
 
 		require CLIENTFLOW_DIR . 'admin/views/plan-overview.php';

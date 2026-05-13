@@ -17,8 +17,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Ensure we have a valid token from the routing layer.
-if ( empty( $cf_proposal_token ) ) {
+// Determine whether this is a preview or a standard proposal URL.
+$cf_preview_token  = $cf_preview_token  ?? '';
+$cf_proposal_token = $cf_proposal_token ?? '';
+$is_preview        = '' !== $cf_preview_token;
+$active_token      = $is_preview ? $cf_preview_token : $cf_proposal_token;
+
+if ( empty( $active_token ) ) {
 	wp_die(
 		esc_html__( 'Invalid proposal link.', 'clientflow' ),
 		esc_html__( 'Not Found', 'clientflow' ),
@@ -26,13 +31,13 @@ if ( empty( $cf_proposal_token ) ) {
 	);
 }
 
-// Payment result page ('success' | 'cancel' | '').
-$cf_payment_result = $cf_payment_result ?? '';
-$cf_session_id     = $cf_session_id     ?? '';
+// Payment result only applies on live proposal URLs.
+$cf_payment_result = $is_preview ? '' : ( $cf_payment_result ?? '' );
+$cf_session_id     = $is_preview ? '' : ( $cf_session_id     ?? '' );
 
 // ── Client email (for success page personalisation) ───────────────────────────
 $client_email = '';
-if ( ! empty( $cf_payment_result ) && class_exists( 'ClientFlow_Proposal_Client' ) ) {
+if ( ! $is_preview && ! empty( $cf_payment_result ) && class_exists( 'ClientFlow_Proposal_Client' ) ) {
 	$_proposal_row = ClientFlow_Proposal_Client::get_by_token( $cf_proposal_token );
 	if ( ! is_wp_error( $_proposal_row ) ) {
 		$client_email = $_proposal_row['client_email'] ?? '';
@@ -41,14 +46,8 @@ if ( ! empty( $cf_payment_result ) && class_exists( 'ClientFlow_Proposal_Client'
 
 // ── Business branding ─────────────────────────────────────────────────────────
 $business_name = get_bloginfo( 'name' );
-$business_logo = '';
-
-// Use the site's custom logo if set (wp_get_attachment_image_src returns array|false).
-$logo_id = get_theme_mod( 'custom_logo' );
-if ( $logo_id ) {
-	$logo_src    = wp_get_attachment_image_src( $logo_id, 'medium' );
-	$business_logo = $logo_src ? esc_url( $logo_src[0] ) : '';
-}
+$business_logo = esc_url( get_option( 'clientflow_logo_url', '' ) );
+$brand_color   = sanitize_hex_color( get_option( 'clientflow_brand_color', '#6366F1' ) ) ?: '#6366F1';
 
 // ── Asset URLs ────────────────────────────────────────────────────────────────
 $build_dir     = CLIENTFLOW_DIR . 'build/';
@@ -154,14 +153,16 @@ $favicon_url = get_site_icon_url( 32 );
 	<script>
 		window.cfClientData = {
 			apiUrl:          <?php echo wp_json_encode( rest_url( 'clientflow/v1/' ) ); ?>,
-			token:           <?php echo wp_json_encode( $cf_proposal_token ); ?>,
+			token:           <?php echo wp_json_encode( $active_token ); ?>,
 			businessName:    <?php echo wp_json_encode( $business_name ); ?>,
 			businessLogo:    <?php echo wp_json_encode( $business_logo ); ?>,
+			brandColor:      <?php echo wp_json_encode( $brand_color ); ?>,
 			nonce:           <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?>,
-			pageType:        <?php echo wp_json_encode( $cf_payment_result ?: 'proposal' ); ?>,
+			pageType:        <?php echo wp_json_encode( $is_preview ? 'preview' : ( $cf_payment_result ?: 'proposal' ) ); ?>,
 			sessionId:       <?php echo wp_json_encode( $cf_session_id ); ?>,
 			clientEmail:     <?php echo wp_json_encode( $client_email ); ?>,
-			isPortalClient:  <?php echo wp_json_encode( class_exists( 'ClientFlow_Portal_Auth' ) && ClientFlow_Portal_Auth::is_authenticated() ); ?>
+			isPortalClient:  <?php echo wp_json_encode( class_exists( 'ClientFlow_Portal_Auth' ) && ClientFlow_Portal_Auth::is_authenticated() ); ?>,
+			pluginLogoUrl:   <?php echo wp_json_encode( esc_url( CLIENTFLOW_URL . 'assets/images/logo.svg' ) ); ?>
 		};
 	</script>
 

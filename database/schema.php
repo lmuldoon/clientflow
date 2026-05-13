@@ -143,6 +143,7 @@ function clientflow_create_tables(): void {
 		content LONGTEXT DEFAULT NULL,
 
 		token VARCHAR(64) NOT NULL DEFAULT '',
+		preview_token VARCHAR(64) DEFAULT NULL,
 
 		status ENUM('draft','sent','viewed','accepted','declined','expired','completed','revision_requested') NOT NULL DEFAULT 'draft',
 
@@ -167,6 +168,7 @@ function clientflow_create_tables(): void {
 
 		PRIMARY KEY  (id),
 		UNIQUE KEY token (token),
+		UNIQUE KEY preview_token (preview_token),
 		KEY owner_id (owner_id),
 		KEY client_id (client_id),
 		KEY status (status),
@@ -187,6 +189,10 @@ function clientflow_create_tables(): void {
 	}
 	if ( ! $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$wpdb->prefix}clientflow_proposals LIKE %s", 'revision_requested_at' ) ) ) {
 		$wpdb->query( "ALTER TABLE {$wpdb->prefix}clientflow_proposals ADD COLUMN revision_requested_at DATETIME DEFAULT NULL" );
+	}
+	if ( ! $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$wpdb->prefix}clientflow_proposals LIKE %s", 'preview_token' ) ) ) {
+		$wpdb->query( "ALTER TABLE {$wpdb->prefix}clientflow_proposals ADD COLUMN preview_token VARCHAR(64) DEFAULT NULL" );
+		$wpdb->query( "ALTER TABLE {$wpdb->prefix}clientflow_proposals ADD UNIQUE KEY preview_token (preview_token)" );
 	}
 
 	// ────────────────────────────────────────────────────────────────────────

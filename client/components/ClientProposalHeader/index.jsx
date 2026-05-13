@@ -89,18 +89,17 @@ const CSS = `
 	padding-top: 6px;
 }
 .cfh-logo {
-	width: 58px;
-	height: 58px;
-	border-radius: 13px;
-	object-fit: cover;
-	border: 1.5px solid rgba(26,26,46,.08);
+	height: 48px;
+	width: auto;
+	max-width: 200px;
+	object-fit: contain;
+	border-radius: 4px;
 	display: block;
 }
 .cfh-initials {
 	width: 58px;
 	height: 58px;
 	border-radius: 13px;
-	background: linear-gradient(140deg, #6366F1 0%, #818CF8 100%);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -245,8 +244,9 @@ export default function ClientProposalHeader( { proposal, businessName, business
 	injectStyles( 'cf-header-s', CSS );
 
 	const { title, expiry_date, status, client_name, accepted_at } = proposal;
-	const initials = ( businessName || 'CF' ).replace( /[^A-Za-z]/g, '' ).slice( 0, 2 ).toUpperCase() || 'CF';
-	const expiry   = expiryInfo( expiry_date, status );
+	const initials    = ( businessName || 'CF' ).replace( /[^A-Za-z]/g, '' ).slice( 0, 2 ).toUpperCase() || 'CF';
+	const expiry      = expiryInfo( expiry_date, status );
+	const brandColor  = window.cfClientData?.brandColor || '#6366F1';
 
 	const fmtDate = iso =>
 		iso ? new Date( iso ).toLocaleDateString( 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' } ) : '';
@@ -298,13 +298,13 @@ export default function ClientProposalHeader( { proposal, businessName, business
 				<div className="cfh-brand">
 					{ businessLogo
 						? <img src={ businessLogo } alt={ businessName } className="cfh-logo" />
-						: <div className="cfh-initials">{ initials }</div>
+						: <div className="cfh-initials" style={ { background: brandColor } }>{ initials }</div>
 					}
 					<span className="cfh-business-name">{ businessName || 'Your Business' }</span>
 				</div>
 
 				<div>
-					<div className="cfh-eyebrow">Proposal</div>
+					<div className="cfh-eyebrow" style={ { color: brandColor } }>Proposal</div>
 					<h1 className="cfh-title">{ title }</h1>
 					{ client_name && (
 						<p className="cfh-prepared">

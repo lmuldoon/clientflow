@@ -394,6 +394,7 @@ const CSS = `
 }
 .cf-list-action-btn:hover { background: var(--cf-indigo-bg); color: var(--cf-indigo); }
 .cf-list-action-btn.danger:hover { background: var(--cf-red-bg); color: var(--cf-red); }
+.cf-list-action-btn.active { background: var(--cf-emerald-bg); color: var(--cf-emerald); }
 .cf-list-action-btn svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2; }
 
 /* Skeleton */
@@ -677,6 +678,7 @@ export default function ProposalList( {
 	const [ refreshing, setRefreshing ]       = useState( false );
 	const [ declineReason, setDeclineReason ] = useState( null ); // { title, reason }
 	const [ sendModal, setSendModal ]         = useState( { open: false, proposal: null, email: '', subject: '' } );
+	const [ previewLoading, setPreviewLoading ] = useState( null ); // proposal id while loading
 
 	async function handleRefresh() {
 		setRefreshing( true );
@@ -779,6 +781,18 @@ export default function ProposalList( {
 			onRefresh();
 		} catch ( e ) {
 			alert( e.message || 'Duplicate failed.' );
+		}
+	}
+
+	async function handleOpenPreview( proposal ) {
+		setPreviewLoading( proposal.id );
+		try {
+			const data = await cfFetch( `proposals/${ proposal.id }/preview-token`, { method: 'POST' } );
+			window.open( data.preview_url, '_blank', 'noopener' );
+		} catch ( e ) {
+			alert( e.message || 'Could not generate preview link.' );
+		} finally {
+			setPreviewLoading( null );
 		}
 	}
 
@@ -1032,6 +1046,24 @@ export default function ProposalList( {
 								</svg>
 							</button>
 						) }
+						<button
+							type="button"
+							className="cf-list-action-btn"
+							title="Open preview"
+							disabled={ previewLoading === proposal.id }
+							onClick={ () => handleOpenPreview( proposal ) }
+						>
+							{ previewLoading === proposal.id ? (
+								<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round" style={ { animation: 'cf-spin 1s linear infinite' } }>
+									<circle cx="12" cy="12" r="10" strokeDasharray="40 20"/>
+								</svg>
+							) : (
+								<svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+									<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+									<circle cx="12" cy="12" r="3"/>
+								</svg>
+							) }
+						</button>
 						<button
 							type="button"
 							className="cf-list-action-btn"

@@ -33,6 +33,17 @@ add_action( 'rest_api_init', static function (): void {
 	$ns     = 'clientflow/v1';
 	$token  = '(?P<token>[a-zA-Z0-9\-]+)';
 
+	// ── GET /client/proposals/preview/{token} — must be registered before the
+	// generic /{token} route so WordPress matches the more specific path first.
+	register_rest_route( $ns, "/client/proposals/preview/{$token}", [
+		'methods'             => WP_REST_Server::READABLE,
+		'callback'            => 'cf_rest_client_get_preview_proposal',
+		'permission_callback' => '__return_true',
+		'args'                => [
+			'token' => [ 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ],
+		],
+	] );
+
 	// ── GET /client/proposals/{token} ────────────────────────────────────────
 	register_rest_route( $ns, "/client/proposals/{$token}", [
 		'methods'             => WP_REST_Server::READABLE,
@@ -89,6 +100,47 @@ add_action( 'rest_api_init', static function (): void {
 // ─────────────────────────────────────────────────────────────────────────────
 // Route handlers
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /clientflow/v1/client/proposals/preview/{token}
+ *
+ * Returns proposal data by preview token — same shape as the client endpoint
+ * but adds is_preview:true and never tracks views or allows actions.
+ */
+function cf_rest_client_get_preview_proposal( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+	$preview_token = (string) $request->get_param( 'token' );
+
+	if ( ! class_exists( 'ClientFlow_Proposal' ) ) {
+		$path = CLIENTFLOW_DIR . 'modules/proposals/class-proposal.php';
+		if ( file_exists( $path ) ) {
+			require_once $path;
+		}
+	}
+
+	$row = ClientFlow_Proposal::get_by_preview_token( $preview_token );
+
+	if ( is_wp_error( $row ) ) {
+		return $row;
+	}
+
+	// Whitelist the same client-safe fields used by the standard client endpoint.
+	$client_fields = [
+		'id', 'title', 'content', 'status', 'total_amount', 'currency',
+		'payment_enabled', 'expiry_date', 'sent_at', 'viewed_at',
+		'accepted_at', 'declined_at', 'created_at', 'client_name',
+		'client_email', 'owner_email', 'decline_reason',
+	];
+
+	$result = array_intersect_key( $row, array_flip( $client_fields ) );
+
+	// Disable payment on previews — no actions should be possible.
+	$result['payment_enabled']   = false;
+	$result['has_paid']          = false;
+	$result['remaining_balance'] = 0.0;
+	$result['is_preview']        = true;
+
+	return new WP_REST_Response( [ 'proposal' => $result ], 200 );
+}
 
 /**
  * GET /clientflow/v1/client/proposals/{token}

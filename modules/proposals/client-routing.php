@@ -33,6 +33,15 @@ add_action( 'init', static function (): void {
 	add_rewrite_tag( '%cf_proposal_token%', '([a-zA-Z0-9\-]+)' );
 	// Payment result: 'success' | 'cancel'
 	add_rewrite_tag( '%cf_payment_result%', '(success|cancel)' );
+	// Preview token — registered before the generic proposal rule so it matches first.
+	add_rewrite_tag( '%cf_preview_token%', '([a-zA-Z0-9\-]+)' );
+
+	// /proposals/preview/{token}[/]  — internal preview viewer (read-only).
+	add_rewrite_rule(
+		'^proposals/preview/([a-zA-Z0-9\-]+)/?$',
+		'index.php?cf_preview_token=$matches[1]',
+		'top'
+	);
 
 	// /proposals/{token}/[/]  — proposal viewer.
 	add_rewrite_rule(
@@ -59,13 +68,33 @@ add_action( 'init', static function (): void {
 // ── Serve the standalone client template ──────────────────────────────────────
 
 add_action( 'template_redirect', static function (): void {
+	$template = CLIENTFLOW_DIR . 'client/template.php';
+
+	// ── Preview URL: /proposals/preview/{token} ──────────────────────────────
+	$preview_token = get_query_var( 'cf_preview_token' );
+
+	if ( $preview_token ) {
+		if ( ! file_exists( $template ) ) {
+			wp_die(
+				esc_html__( 'Proposal viewer template not found.', 'clientflow' ),
+				esc_html__( 'Error', 'clientflow' ),
+				[ 'response' => 500 ]
+			);
+		}
+
+		$cf_preview_token = sanitize_text_field( $preview_token );
+
+		// phpcs:ignore WordPressVIPMinimum.Files.IncludingFile.UsingVariable
+		include $template;
+		exit;
+	}
+
+	// ── Standard proposal URL: /proposals/{token} ────────────────────────────
 	$token = get_query_var( 'cf_proposal_token' );
 
 	if ( ! $token ) {
 		return;
 	}
-
-	$template = CLIENTFLOW_DIR . 'client/template.php';
 
 	if ( ! file_exists( $template ) ) {
 		wp_die(

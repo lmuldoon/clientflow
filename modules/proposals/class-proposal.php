@@ -459,6 +459,120 @@ class ClientFlow_Proposal {
 		return self::create( $owner_id, $new_data );
 	}
 
+	// ── Preview Token ─────────────────────────────────────────────────────────
+
+	/**
+	 * Generate (or regenerate) a preview token for a proposal.
+	 *
+	 * The preview token is a separate UUID from the client-facing token so
+	 * that revoking the preview never affects the live proposal URL.
+	 *
+	 * @param int $id       Proposal ID.
+	 * @param int $owner_id Ownership check.
+	 *
+	 * @return string|WP_Error The new preview token on success.
+	 */
+	public static function generate_preview_token( int $id, int $owner_id ): string|WP_Error {
+		global $wpdb;
+
+		$exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM " . self::table() . " WHERE id = %d AND owner_id = %d AND deleted_at IS NULL",
+				$id,
+				$owner_id
+			)
+		);
+
+		if ( ! $exists ) {
+			return new WP_Error( 'proposal_not_found', __( 'Proposal not found.', 'clientflow' ), [ 'status' => 404 ] );
+		}
+
+		$token  = wp_generate_uuid4();
+		$result = $wpdb->update(
+			self::table(),
+			[ 'preview_token' => $token, 'updated_at' => current_time( 'mysql' ) ],
+			[ 'id' => $id, 'owner_id' => $owner_id ],
+			[ '%s', '%s' ],
+			[ '%d', '%d' ]
+		);
+
+		if ( false === $result ) {
+			return new WP_Error( 'db_update_failed', __( 'Failed to generate preview token.', 'clientflow' ), [ 'status' => 500 ] );
+		}
+
+		return $token;
+	}
+
+	/**
+	 * Revoke the preview token for a proposal (sets it to NULL).
+	 *
+	 * @param int $id       Proposal ID.
+	 * @param int $owner_id Ownership check.
+	 *
+	 * @return true|WP_Error
+	 */
+	public static function revoke_preview_token( int $id, int $owner_id ): true|WP_Error {
+		global $wpdb;
+
+		$exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT id FROM " . self::table() . " WHERE id = %d AND owner_id = %d AND deleted_at IS NULL",
+				$id,
+				$owner_id
+			)
+		);
+
+		if ( ! $exists ) {
+			return new WP_Error( 'proposal_not_found', __( 'Proposal not found.', 'clientflow' ), [ 'status' => 404 ] );
+		}
+
+		$result = $wpdb->update(
+			self::table(),
+			[ 'preview_token' => null, 'updated_at' => current_time( 'mysql' ) ],
+			[ 'id' => $id, 'owner_id' => $owner_id ],
+			[ null, '%s' ],
+			[ '%d', '%d' ]
+		);
+
+		if ( false === $result ) {
+			return new WP_Error( 'db_update_failed', __( 'Failed to revoke preview token.', 'clientflow' ), [ 'status' => 500 ] );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Get a proposal by its preview token.
+	 *
+	 * @param string $preview_token
+	 *
+	 * @return array|WP_Error
+	 */
+	public static function get_by_preview_token( string $preview_token ): array|WP_Error {
+		global $wpdb;
+
+		$t   = self::table();
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT p.*, c.name AS client_name, c.email AS client_email,
+				        c.company AS client_company, c.phone AS client_phone,
+				        u.user_email AS owner_email
+				 FROM $t p
+				 LEFT JOIN {$wpdb->prefix}clientflow_clients c ON p.client_id = c.id
+				 LEFT JOIN {$wpdb->users} u ON p.owner_id = u.ID
+				 WHERE p.preview_token = %s AND p.deleted_at IS NULL",
+				$preview_token
+			),
+			ARRAY_A
+		);
+
+		if ( ! $row ) {
+			return new WP_Error( 'proposal_not_found', __( 'Preview link not found or has been revoked.', 'clientflow' ), [ 'status' => 404 ] );
+		}
+
+		return self::prepare_row( $row );
+	}
+
 	// ── Helpers ───────────────────────────────────────────────────────────────
 
 	/**

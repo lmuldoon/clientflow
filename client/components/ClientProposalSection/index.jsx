@@ -42,7 +42,10 @@ const CSS = `
 	font-size: 15.5px;
 	line-height: 1.78;
 	color: #374151;
-	margin: 0;
+	margin: 0 0 14px;
+}
+.cfs-text p:last-child {
+	margin-bottom: 0;
 }
 
 /* ── List ──────────────────────────────────────────────────── */
@@ -110,9 +113,27 @@ export default function ClientProposalSection( { section } ) {
 	}
 
 	if ( type === 'text' ) {
+		const renderInline = ( text ) =>
+			text.split( /(\*\*[^*]+\*\*)/ ).map( ( chunk, i ) =>
+				chunk.startsWith( '**' ) && chunk.endsWith( '**' )
+					? <strong key={ i }>{ chunk.slice( 2, -2 ) }</strong>
+					: chunk
+			);
+
+		const paragraphs = ( content || '' ).split( /\n\n+/ );
+
 		return (
 			<div className="cfs-text">
-				<p>{ content }</p>
+				{ paragraphs.map( ( para, pi ) => (
+					<p key={ pi }>
+						{ para.split( '\n' ).map( ( line, li, arr ) => (
+							<wp.element.Fragment key={ li }>
+								{ renderInline( line ) }
+								{ li < arr.length - 1 && <br /> }
+							</wp.element.Fragment>
+						) ) }
+					</p>
+				) ) }
 			</div>
 		);
 	}

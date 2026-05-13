@@ -800,6 +800,7 @@ function cf_send_project_completion_email( array $project ): void {
 
 function cf_maybe_send_testimonial_email( array $project, int $owner_id ): void {
 	if ( '1' !== get_option( 'clientflow_testimonial_enabled' ) ) return;
+	if ( ! cf_can_user( $owner_id, 'use_testimonials' ) ) return;
 
 	$proposal_id = (int) ( $project['proposal_id'] ?? 0 );
 	if ( ! $proposal_id ) return;

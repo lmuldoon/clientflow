@@ -24,26 +24,37 @@ $errors = [];
 
 if ( 'POST' === $_SERVER['REQUEST_METHOD'] && ! empty( $_POST['cf_settings_nonce'] ) ) {
 	if ( wp_verify_nonce( $_POST['cf_settings_nonce'], 'cf_save_settings' ) ) {
+		// Branding options: available to all plans.
 		$fields = [
-			'clientflow_stripe_publishable_key' => 'sanitize_text_field',
-			'clientflow_stripe_secret_key'      => 'sanitize_text_field',
-			'clientflow_stripe_webhook_secret'  => 'sanitize_text_field',
-			'clientflow_business_name'          => 'sanitize_text_field',
-			'clientflow_from_name'              => 'sanitize_text_field',
-			'clientflow_from_email'             => 'sanitize_email',
-			'clientflow_brand_color'            => 'sanitize_hex_color',
-			'clientflow_logo_url'               => 'esc_url_raw',
-			'clientflow_testimonial_body'       => 'sanitize_textarea_field',
-			'clientflow_testimonial_url'        => 'esc_url_raw',
-			'clientflow_testimonial_cta_label'  => 'sanitize_text_field',
+			'clientflow_business_name' => 'sanitize_text_field',
+			'clientflow_from_name'     => 'sanitize_text_field',
+			'clientflow_from_email'    => 'sanitize_email',
+			'clientflow_brand_color'   => 'sanitize_hex_color',
+			'clientflow_logo_url'      => 'esc_url_raw',
 		];
 
 		foreach ( $fields as $option => $sanitizer ) {
 			$value = isset( $_POST[ $option ] ) ? call_user_func( $sanitizer, wp_unslash( $_POST[ $option ] ) ) : '';
 			update_option( $option, $value );
 		}
-		// Checkbox: unchecked boxes don't appear in POST, so handle explicitly.
-		update_option( 'clientflow_testimonial_enabled', ! empty( $_POST['clientflow_testimonial_enabled'] ) ? '1' : '' );
+
+		// Stripe options: paid plans only — do not overwrite on free to avoid clearing stored keys.
+		$_save_owner_id = cf_get_owner_id( get_current_user_id() );
+		if ( cf_can_user( $_save_owner_id, 'use_payments' ) ) {
+			update_option( 'clientflow_stripe_publishable_key', sanitize_text_field( wp_unslash( $_POST['clientflow_stripe_publishable_key'] ?? '' ) ) );
+			update_option( 'clientflow_stripe_secret_key',      sanitize_text_field( wp_unslash( $_POST['clientflow_stripe_secret_key'] ?? '' ) ) );
+			update_option( 'clientflow_stripe_webhook_secret',  sanitize_text_field( wp_unslash( $_POST['clientflow_stripe_webhook_secret'] ?? '' ) ) );
+		}
+
+		// Testimonial options: paid plans only.
+		if ( cf_can_user( $_save_owner_id, 'use_testimonials' ) ) {
+			update_option( 'clientflow_testimonial_body',      sanitize_textarea_field( wp_unslash( $_POST['clientflow_testimonial_body'] ?? '' ) ) );
+			update_option( 'clientflow_testimonial_url',       esc_url_raw( wp_unslash( $_POST['clientflow_testimonial_url'] ?? '' ) ) );
+			update_option( 'clientflow_testimonial_cta_label', sanitize_text_field( wp_unslash( $_POST['clientflow_testimonial_cta_label'] ?? '' ) ) );
+			update_option( 'clientflow_testimonial_enabled',   ! empty( $_POST['clientflow_testimonial_enabled'] ) ? '1' : '' );
+		} else {
+			update_option( 'clientflow_testimonial_enabled', '' );
+		}
 
 		$saved = true;
 	} else {
@@ -66,10 +77,14 @@ $from_email    = get_option( 'clientflow_from_email', '' );
 $brand_color   = get_option( 'clientflow_brand_color', '#6366f1' );
 $logo_url      = get_option( 'clientflow_logo_url', '' );
 
-$testimonial_enabled   = get_option( 'clientflow_testimonial_enabled', '' );
-$testimonial_body      = get_option( 'clientflow_testimonial_body', '' );
+$testimonial_enabled    = get_option( 'clientflow_testimonial_enabled', '' );
+$testimonial_body       = get_option( 'clientflow_testimonial_body', '' );
 $testimonial_review_url = get_option( 'clientflow_testimonial_url', '' );
-$testimonial_cta_label = get_option( 'clientflow_testimonial_cta_label', '' );
+$testimonial_cta_label  = get_option( 'clientflow_testimonial_cta_label', '' );
+
+$cf_owner_id        = cf_get_owner_id( get_current_user_id() );
+$cf_payments_locked = ! cf_can_user( $cf_owner_id, 'use_payments' );
+$cf_is_free         = ! cf_can_user( $cf_owner_id, 'use_testimonials' );
 
 ?>
 <div>
@@ -373,117 +388,6 @@ $testimonial_cta_label = get_option( 'clientflow_testimonial_cta_label', '' );
 
 		<div class="cf-settings-grid">
 
-			<!-- ── Stripe API Keys card ──────────────────────────────────────────── -->
-			<div class="cf-card">
-				<p class="cf-card__title">
-					<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
-					</svg>
-					<?php esc_html_e( 'Stripe API Keys', 'clientflow' ); ?>
-					<?php if ( $stripe_mode ) : ?>
-						<span class="cf-badge cf-badge--<?php echo esc_attr( $stripe_mode ); ?>">
-							<?php echo esc_html( ucfirst( $stripe_mode ) ); ?> <?php esc_html_e( 'mode', 'clientflow' ); ?>
-						</span>
-					<?php else : ?>
-						<span class="cf-badge cf-badge--none"><?php esc_html_e( 'Not configured', 'clientflow' ); ?></span>
-					<?php endif; ?>
-				</p>
-				<p class="cf-card__desc">
-					<?php esc_html_e( 'Find these in your Stripe Dashboard under Developers → API Keys.', 'clientflow' ); ?>
-				</p>
-
-				<div class="cf-field">
-					<label class="cf-label" for="cf-pub-key">
-						<?php esc_html_e( 'Publishable Key', 'clientflow' ); ?>
-						<span><?php esc_html_e( '(pk_test_… or pk_live_…)', 'clientflow' ); ?></span>
-					</label>
-					<input
-						type="text"
-						id="cf-pub-key"
-						name="clientflow_stripe_publishable_key"
-						class="cf-input"
-						value="<?php echo esc_attr( $pub_key ); ?>"
-						placeholder="pk_test_…"
-						autocomplete="off"
-						spellcheck="false"
-					>
-				</div>
-
-				<div class="cf-field">
-					<label class="cf-label" for="cf-secret-key">
-						<?php esc_html_e( 'Secret Key', 'clientflow' ); ?>
-						<span><?php esc_html_e( '(sk_test_… or sk_live_…)', 'clientflow' ); ?></span>
-					</label>
-					<input
-						type="password"
-						id="cf-secret-key"
-						name="clientflow_stripe_secret_key"
-						class="cf-input"
-						value="<?php echo esc_attr( $secret_key ); ?>"
-						placeholder="sk_test_…"
-						autocomplete="new-password"
-						spellcheck="false"
-					>
-					<p class="cf-help"><?php esc_html_e( 'Never share your secret key. It is stored encrypted in your database.', 'clientflow' ); ?></p>
-				</div>
-			</div>
-
-			<!-- ── Webhook card ──────────────────────────────────────────────────── -->
-			<div class="cf-card">
-				<p class="cf-card__title">
-					<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.8 10.72a19.79 19.79 0 01-3.07-8.67A2 2 0 012.71 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.67a16 16 0 006.29 6.29l1.03-1.04a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
-					</svg>
-					<?php esc_html_e( 'Stripe Webhook', 'clientflow' ); ?>
-				</p>
-				<p class="cf-card__desc">
-					<?php
-					printf(
-						esc_html__( 'Add this URL in your Stripe Dashboard under Developers → Webhooks. Listen for the %s event.', 'clientflow' ),
-						'<code>checkout.session.completed</code>'
-					);
-					?>
-				</p>
-
-				<div class="cf-field">
-					<label class="cf-label" for="cf-webhook-url"><?php esc_html_e( 'Webhook Endpoint URL', 'clientflow' ); ?></label>
-					<div class="cf-webhook-row">
-						<input
-							type="text"
-							id="cf-webhook-url"
-							class="cf-input"
-							value="<?php echo esc_url( $webhook_url ); ?>"
-							readonly
-						>
-						<button
-							type="button"
-							class="cf-copy-btn"
-							onclick="navigator.clipboard.writeText(document.getElementById('cf-webhook-url').value).then(function(){this.textContent='Copied!';}.bind(this))"
-						><?php esc_html_e( 'Copy', 'clientflow' ); ?></button>
-					</div>
-				</div>
-
-				<div class="cf-field">
-					<label class="cf-label" for="cf-webhook-secret">
-						<?php esc_html_e( 'Signing Secret', 'clientflow' ); ?>
-						<span><?php esc_html_e( '(whsec_…)', 'clientflow' ); ?></span>
-					</label>
-					<input
-						type="password"
-						id="cf-webhook-secret"
-						name="clientflow_stripe_webhook_secret"
-						class="cf-input"
-						value="<?php echo esc_attr( $webhook_sec ); ?>"
-						placeholder="whsec_…"
-						autocomplete="new-password"
-						spellcheck="false"
-					>
-					<p class="cf-help">
-						<?php esc_html_e( 'Found in your webhook\'s settings page on the Stripe Dashboard. Used to verify events are genuinely from Stripe.', 'clientflow' ); ?>
-					</p>
-				</div>
-			</div>
-
 			<!-- ── Branding card ─────────────────────────────────────────────────── -->
 			<div class="cf-card">
 				<p class="cf-card__title">
@@ -599,6 +503,156 @@ $testimonial_cta_label = get_option( 'clientflow_testimonial_cta_label', '' );
 				</div>
 			</div>
 
+			<!-- ── Stripe cards (stacked in one grid column) ────────────────────── -->
+			<div style="display:flex;flex-direction:column;gap:20px;">
+
+			<!-- ── Stripe API Keys card ──────────────────────────────────────────── -->
+			<div class="cf-card">
+				<p class="cf-card__title">
+					<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+					</svg>
+					<?php esc_html_e( 'Stripe API Keys', 'clientflow' ); ?>
+					<?php if ( ! $cf_payments_locked && $stripe_mode ) : ?>
+						<span class="cf-badge cf-badge--<?php echo esc_attr( $stripe_mode ); ?>">
+							<?php echo esc_html( ucfirst( $stripe_mode ) ); ?> <?php esc_html_e( 'mode', 'clientflow' ); ?>
+						</span>
+					<?php elseif ( ! $cf_payments_locked ) : ?>
+						<span class="cf-badge cf-badge--none"><?php esc_html_e( 'Not configured', 'clientflow' ); ?></span>
+					<?php endif; ?>
+				</p>
+				<p class="cf-card__desc">
+					<?php esc_html_e( 'Find these in your Stripe Dashboard under Developers → API Keys.', 'clientflow' ); ?>
+				</p>
+
+				<div style="position:relative;">
+
+					<?php if ( $cf_payments_locked ) : ?>
+					<div style="position:absolute;inset:0;z-index:10;background:rgba(255,255,255,0.85);backdrop-filter:blur(3px);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:20px;">
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+							<path d="M7 11V7a5 5 0 0110 0v4"/>
+						</svg>
+						<p style="margin:0;font-size:13px;font-weight:600;color:#1A1A2E;"><?php esc_html_e( 'Available on Pro &amp; Agency plans', 'clientflow' ); ?></p>
+						<a href="https://clientflow.io/pricing" target="_blank" rel="noopener" style="display:inline-block;padding:7px 18px;background:#6366F1;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;"><?php esc_html_e( 'Upgrade', 'clientflow' ); ?></a>
+					</div>
+					<?php endif; ?>
+
+					<div class="cf-field">
+						<label class="cf-label" for="cf-pub-key">
+							<?php esc_html_e( 'Publishable Key', 'clientflow' ); ?>
+							<span><?php esc_html_e( '(pk_test_… or pk_live_…)', 'clientflow' ); ?></span>
+						</label>
+						<input
+							type="text"
+							id="cf-pub-key"
+							name="clientflow_stripe_publishable_key"
+							class="cf-input"
+							<?php disabled( $cf_payments_locked, true ); ?>
+							value="<?php echo esc_attr( $pub_key ); ?>"
+							placeholder="pk_test_…"
+							autocomplete="off"
+							spellcheck="false"
+						>
+					</div>
+
+					<div class="cf-field">
+						<label class="cf-label" for="cf-secret-key">
+							<?php esc_html_e( 'Secret Key', 'clientflow' ); ?>
+							<span><?php esc_html_e( '(sk_test_… or sk_live_…)', 'clientflow' ); ?></span>
+						</label>
+						<input
+							type="password"
+							id="cf-secret-key"
+							name="clientflow_stripe_secret_key"
+							class="cf-input"
+							<?php disabled( $cf_payments_locked, true ); ?>
+							value="<?php echo esc_attr( $secret_key ); ?>"
+							placeholder="sk_test_…"
+							autocomplete="new-password"
+							spellcheck="false"
+						>
+						<p class="cf-help"><?php esc_html_e( 'Never share your secret key. It is stored encrypted in your database.', 'clientflow' ); ?></p>
+					</div>
+
+				</div>
+			</div>
+
+			<!-- ── Webhook card ──────────────────────────────────────────────────── -->
+			<div class="cf-card">
+				<p class="cf-card__title">
+					<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.8 10.72a19.79 19.79 0 01-3.07-8.67A2 2 0 012.71 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 9.67a16 16 0 006.29 6.29l1.03-1.04a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+					</svg>
+					<?php esc_html_e( 'Stripe Webhook', 'clientflow' ); ?>
+				</p>
+				<p class="cf-card__desc">
+					<?php
+					printf(
+						esc_html__( 'Add this URL in your Stripe Dashboard under Developers → Webhooks. Listen for the %s event.', 'clientflow' ),
+						'<code>checkout.session.completed</code>'
+					);
+					?>
+				</p>
+
+				<div style="position:relative;">
+
+					<?php if ( $cf_payments_locked ) : ?>
+					<div style="position:absolute;inset:0;z-index:10;background:rgba(255,255,255,0.85);backdrop-filter:blur(3px);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:20px;">
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+							<path d="M7 11V7a5 5 0 0110 0v4"/>
+						</svg>
+						<p style="margin:0;font-size:13px;font-weight:600;color:#1A1A2E;"><?php esc_html_e( 'Available on Pro &amp; Agency plans', 'clientflow' ); ?></p>
+						<a href="https://clientflow.io/pricing" target="_blank" rel="noopener" style="display:inline-block;padding:7px 18px;background:#6366F1;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;"><?php esc_html_e( 'Upgrade', 'clientflow' ); ?></a>
+					</div>
+					<?php endif; ?>
+
+					<div class="cf-field">
+						<label class="cf-label" for="cf-webhook-url"><?php esc_html_e( 'Webhook Endpoint URL', 'clientflow' ); ?></label>
+						<div class="cf-webhook-row">
+							<input
+								type="text"
+								id="cf-webhook-url"
+								class="cf-input"
+								value="<?php echo esc_url( $webhook_url ); ?>"
+								readonly
+							>
+							<button
+								type="button"
+								class="cf-copy-btn"
+								<?php disabled( $cf_payments_locked, true ); ?>
+								onclick="navigator.clipboard.writeText(document.getElementById('cf-webhook-url').value).then(function(){this.textContent='Copied!';}.bind(this))"
+							><?php esc_html_e( 'Copy', 'clientflow' ); ?></button>
+						</div>
+					</div>
+
+					<div class="cf-field">
+						<label class="cf-label" for="cf-webhook-secret">
+							<?php esc_html_e( 'Signing Secret', 'clientflow' ); ?>
+							<span><?php esc_html_e( '(whsec_…)', 'clientflow' ); ?></span>
+						</label>
+						<input
+							type="password"
+							id="cf-webhook-secret"
+							name="clientflow_stripe_webhook_secret"
+							class="cf-input"
+							<?php disabled( $cf_payments_locked, true ); ?>
+							value="<?php echo esc_attr( $webhook_sec ); ?>"
+							placeholder="whsec_…"
+							autocomplete="new-password"
+							spellcheck="false"
+						>
+						<p class="cf-help">
+							<?php esc_html_e( 'Found in your webhook\'s settings page on the Stripe Dashboard. Used to verify events are genuinely from Stripe.', 'clientflow' ); ?>
+						</p>
+					</div>
+
+				</div>
+			</div>
+
+			</div><!-- /.stripe-column -->
+
 			<!-- ── Testimonial Emails card ──────────────────────────────────────── -->
 			<div class="cf-card">
 				<p class="cf-card__title">
@@ -611,70 +665,89 @@ $testimonial_cta_label = get_option( 'clientflow_testimonial_cta_label', '' );
 					<?php esc_html_e( 'When enabled, clients will receive a review request email once their final payment clears. Tick the box below to turn this on. Available on Pro and Agency plans.', 'clientflow' ); ?>
 				</p>
 
-				<div class="cf-field" style="display:flex;align-items:center;gap:10px;">
-					<input
-						type="checkbox"
-						id="cf-testimonial-enabled"
-						name="clientflow_testimonial_enabled"
-						value="1"
-						<?php checked( $testimonial_enabled, '1' ); ?>
-						style="width:18px;height:18px;cursor:pointer;flex-shrink:0;"
-					>
-					<label for="cf-testimonial-enabled" style="margin:0;font-size:13px;font-weight:500;color:#374151;cursor:pointer;">
-						<?php esc_html_e( 'Send testimonial request email after final payment', 'clientflow' ); ?>
-					</label>
-				</div>
+				<div style="position:relative;">
 
-				<div class="cf-divider"></div>
+					<?php if ( $cf_is_free ) : ?>
+					<div style="position:absolute;inset:0;z-index:10;background:rgba(255,255,255,0.85);backdrop-filter:blur(3px);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:20px;">
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+							<path d="M7 11V7a5 5 0 0110 0v4"/>
+						</svg>
+						<p style="margin:0;font-size:13px;font-weight:600;color:#1A1A2E;"><?php esc_html_e( 'Available on Pro &amp; Agency plans', 'clientflow' ); ?></p>
+						<a href="https://clientflow.io/pricing" target="_blank" rel="noopener" style="display:inline-block;padding:7px 18px;background:#6366F1;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;"><?php esc_html_e( 'Upgrade', 'clientflow' ); ?></a>
+					</div>
+					<?php endif; ?>
 
-				<div class="cf-field">
-					<label class="cf-label" for="cf-testimonial-body">
-						<?php esc_html_e( 'Email body copy', 'clientflow' ); ?>
-					</label>
-					<textarea
-						id="cf-testimonial-body"
-						name="clientflow_testimonial_body"
-						class="cf-input"
-						rows="4"
-						style="height:auto;padding:12px 14px;font-family:-apple-system,sans-serif;letter-spacing:0;resize:vertical;"
-						placeholder="<?php esc_attr_e( "It was a pleasure working with you. If you have a moment, we\xe2\x80\x99d love to hear your feedback \xe2\x80\x94 it helps us improve and helps others find us.", 'clientflow' ); ?>"
-					><?php echo esc_textarea( $testimonial_body ); ?></textarea>
-					<p class="cf-hint"><?php esc_html_e( 'Plain text. Leave blank to use the default message.', 'clientflow' ); ?></p>
-				</div>
+					<div class="cf-field" style="display:flex;align-items:center;gap:10px;">
+						<input
+							type="checkbox"
+							id="cf-testimonial-enabled"
+							name="clientflow_testimonial_enabled"
+							value="1"
+							<?php checked( $testimonial_enabled, '1' ); ?>
+							<?php disabled( $cf_is_free, true ); ?>
+							style="width:18px;height:18px;cursor:pointer;flex-shrink:0;"
+						>
+						<label for="cf-testimonial-enabled" style="margin:0;font-size:13px;font-weight:500;color:#374151;cursor:pointer;">
+							<?php esc_html_e( 'Send testimonial request email after final payment', 'clientflow' ); ?>
+						</label>
+					</div>
 
-				<div class="cf-field">
-					<label class="cf-label" for="cf-testimonial-url">
-						<?php esc_html_e( 'Review / testimonial URL', 'clientflow' ); ?>
-						<span><?php esc_html_e( '(optional)', 'clientflow' ); ?></span>
-					</label>
-					<input
-						type="url"
-						id="cf-testimonial-url"
-						name="clientflow_testimonial_url"
-						class="cf-input"
-						value="<?php echo esc_url( $testimonial_review_url ); ?>"
-						placeholder="https://g.page/r/your-google-review-link"
-						autocomplete="off"
-						spellcheck="false"
-					>
-					<p class="cf-hint"><?php esc_html_e( 'Google Reviews, Trustpilot, Clutch, or any custom form. Leave blank to omit the button.', 'clientflow' ); ?></p>
-				</div>
+					<div class="cf-divider"></div>
 
-				<div class="cf-field">
-					<label class="cf-label" for="cf-testimonial-cta-label">
-						<?php esc_html_e( 'Button label', 'clientflow' ); ?>
-						<span><?php esc_html_e( '(optional)', 'clientflow' ); ?></span>
-					</label>
-					<input
-						type="text"
-						id="cf-testimonial-cta-label"
-						name="clientflow_testimonial_cta_label"
-						class="cf-input"
-						value="<?php echo esc_attr( $testimonial_cta_label ); ?>"
-						placeholder="<?php esc_attr_e( 'Leave a Review', 'clientflow' ); ?>"
-						spellcheck="false"
-					>
-					<p class="cf-hint"><?php esc_html_e( 'Text shown on the review button. Defaults to "Leave a Review".', 'clientflow' ); ?></p>
+					<div class="cf-field">
+						<label class="cf-label" for="cf-testimonial-body">
+							<?php esc_html_e( 'Email body copy', 'clientflow' ); ?>
+						</label>
+						<textarea
+							id="cf-testimonial-body"
+							name="clientflow_testimonial_body"
+							class="cf-input"
+							rows="4"
+							<?php disabled( $cf_is_free, true ); ?>
+							style="height:auto;padding:12px 14px;font-family:-apple-system,sans-serif;letter-spacing:0;resize:vertical;"
+							placeholder="<?php esc_attr_e( "It was a pleasure working with you. If you have a moment, we\xe2\x80\x99d love to hear your feedback \xe2\x80\x94 it helps us improve and helps others find us.", 'clientflow' ); ?>"
+						><?php echo esc_textarea( $testimonial_body ); ?></textarea>
+						<p class="cf-hint"><?php esc_html_e( 'Plain text. Leave blank to use the default message.', 'clientflow' ); ?></p>
+					</div>
+
+					<div class="cf-field">
+						<label class="cf-label" for="cf-testimonial-url">
+							<?php esc_html_e( 'Review / testimonial URL', 'clientflow' ); ?>
+							<span><?php esc_html_e( '(optional)', 'clientflow' ); ?></span>
+						</label>
+						<input
+							type="url"
+							id="cf-testimonial-url"
+							name="clientflow_testimonial_url"
+							class="cf-input"
+							<?php disabled( $cf_is_free, true ); ?>
+							value="<?php echo esc_url( $testimonial_review_url ); ?>"
+							placeholder="https://g.page/r/your-google-review-link"
+							autocomplete="off"
+							spellcheck="false"
+						>
+						<p class="cf-hint"><?php esc_html_e( 'Google Reviews, Trustpilot, Clutch, or any custom form. Leave blank to omit the button.', 'clientflow' ); ?></p>
+					</div>
+
+					<div class="cf-field">
+						<label class="cf-label" for="cf-testimonial-cta-label">
+							<?php esc_html_e( 'Button label', 'clientflow' ); ?>
+							<span><?php esc_html_e( '(optional)', 'clientflow' ); ?></span>
+						</label>
+						<input
+							type="text"
+							id="cf-testimonial-cta-label"
+							name="clientflow_testimonial_cta_label"
+							class="cf-input"
+							<?php disabled( $cf_is_free, true ); ?>
+							value="<?php echo esc_attr( $testimonial_cta_label ); ?>"
+							placeholder="<?php esc_attr_e( 'Leave a Review', 'clientflow' ); ?>"
+							spellcheck="false"
+						>
+						<p class="cf-hint"><?php esc_html_e( 'Text shown on the review button. Defaults to "Leave a Review".', 'clientflow' ); ?></p>
+					</div>
+
 				</div>
 			</div>
 

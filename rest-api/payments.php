@@ -419,9 +419,12 @@ function cf_handle_checkout_complete( array $session ): void {
 	}
 	do_action( 'cf_payment_completed', ! is_wp_error( $payment ) ? (int) $payment['id'] : 0, (int) $proposal['owner_id'] );
 
-	// If the linked project was already marked complete before this payment arrived,
-	// the testimonial check at project-completion time would have found no completed
+	// If the proposal was already marked complete before this payment arrived,
+	// the testimonial check at completion time would have found no completed
 	// payment and silently skipped. Retry it now.
+	//
+	// Agency path: proposal completed via project → check for completed project.
+	// Pro path: proposal completed directly (no project) → check proposal status.
 	$completed_project = $wpdb->get_row(
 		$wpdb->prepare(
 			"SELECT * FROM {$wpdb->prefix}clientflow_projects WHERE proposal_id = %d AND status = 'completed' LIMIT 1",
@@ -431,6 +434,16 @@ function cf_handle_checkout_complete( array $session ): void {
 	);
 	if ( $completed_project && function_exists( 'cf_maybe_send_testimonial_email' ) ) {
 		cf_maybe_send_testimonial_email( $completed_project, (int) $proposal['owner_id'] );
+	} elseif ( ! $completed_project && function_exists( 'cf_maybe_send_testimonial_email' ) ) {
+		$proposal_status = (string) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT status FROM {$wpdb->prefix}clientflow_proposals WHERE id = %d",
+				$proposal_id
+			)
+		);
+		if ( 'completed' === $proposal_status ) {
+			cf_maybe_send_testimonial_email( [ 'proposal_id' => $proposal_id ], (int) $proposal['owner_id'] );
+		}
 	}
 
 	// Log event.
