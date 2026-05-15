@@ -364,6 +364,7 @@ function injectStyles() {
 function cfFetch( endpoint, options = {} ) {
 	const { apiUrl, nonce } = window.cfData || {};
 	return fetch( apiUrl + endpoint, {
+		cache: 'no-store',
 		headers: {
 			'Content-Type': 'application/json',
 			'X-WP-Nonce': nonce,

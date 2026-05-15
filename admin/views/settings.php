@@ -591,9 +591,11 @@ $cf_is_free         = ! clientflow_can_user( $cf_owner_id, 'use_testimonials' );
 				<p class="cf-card__desc">
 					<?php
 					printf(
-						/* translators: %s is a <code> HTML element containing the checkout.session.completed event name */
-						esc_html__( 'Add this URL in your Stripe Dashboard under Developers → Webhooks. Listen for the %s event.', 'clientflow' ),
-						'<code>checkout.session.completed</code>'
+						/* translators: 1: <code>checkout.session.completed</code>, 2: <code>checkout.session.async_payment_succeeded</code>, 3: <code>checkout.session.async_payment_failed</code> */
+						esc_html__( 'In your Stripe Dashboard go to Developers → Workbench → Webhooks and add a new destination. Select %1$s, %2$s, and %3$s events.', 'clientflow' ),
+						'<code>checkout.session.completed</code>',
+						'<code>checkout.session.async_payment_succeeded</code>',
+						'<code>checkout.session.async_payment_failed</code>'
 					);
 					?>
 				</p>

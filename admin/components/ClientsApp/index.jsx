@@ -6,6 +6,7 @@ async function cfFetch( path, options = {} ) {
 	const { apiUrl, nonce } = window.cfData || {};
 	const url = ( apiUrl || '/wp-json/clientflow/v1/' ) + path;
 	const res = await fetch( url, {
+		cache: 'no-store',
 		headers: {
 			'Content-Type': 'application/json',
 			'X-WP-Nonce': nonce || '',

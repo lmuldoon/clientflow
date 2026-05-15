@@ -393,7 +393,8 @@ function clientflow_portal_get_receipt( WP_REST_Request $request ): WP_REST_Resp
 		'payment_type'  => $payment_type,
 		'client_name'   => $user->display_name,
 		'client_email'  => $user->user_email,
-		'business_name' => get_option( 'clientflow_business_name' ) ?: get_option( 'blogname' ),
-		'business_logo' => get_option( 'clientflow_logo_url', '' ),
+		'business_name'  => get_option( 'clientflow_business_name' ) ?: get_option( 'blogname' ),
+		'business_logo'  => get_option( 'clientflow_logo_url', '' ),
+		'brand_color'    => get_option( 'clientflow_brand_color', '#6366F1' ),
 	], 200 );
 }

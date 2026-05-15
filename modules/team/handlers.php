@@ -100,14 +100,6 @@ function clientflow_team_invite_member( int $owner_id, string $email, string $na
 
 		$member_user_id = (int) $member_user_id;
 		$is_new_user    = true;
-
-		// Update display name and assign plugin role.
-		wp_update_user( [
-			'ID'           => $member_user_id,
-			'display_name' => $name,
-			'first_name'   => $name,
-			'role'         => 'clientflow_member',
-		] );
 	}
 
 	// Lock the owner's meta row so concurrent requests can't both pass the
@@ -156,6 +148,17 @@ function clientflow_team_invite_member( int $owner_id, string $email, string $na
 	) );
 
 	$wpdb->query( 'COMMIT' );
+
+	// Assign role and display name after the team_members row is committed so
+	// the security hook finds the record and doesn't immediately strip the role.
+	if ( $is_new_user ) {
+		wp_update_user( [
+			'ID'           => $member_user_id,
+			'display_name' => $name,
+			'first_name'   => $name,
+			'role'         => 'clientflow_member',
+		] );
+	}
 
 	// Send invite email.
 	clientflow_team_send_invite_email( $member_user_id, $owner_id, $is_new_user );

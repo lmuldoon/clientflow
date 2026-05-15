@@ -23,6 +23,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// Cron callback for deferred testimonial email — scheduled 60s after payment
+// to avoid SMTP burst-delivery failures when multiple emails fire in one request.
+add_action( 'clientflow_send_testimonial_email', 'clientflow_payments_send_scheduled_testimonial', 10, 2 );
+
+function clientflow_payments_send_scheduled_testimonial( array $context, int $owner_id ): void {
+	if ( function_exists( 'clientflow_maybe_send_testimonial_email' ) ) {
+		clientflow_maybe_send_testimonial_email( $context, $owner_id );
+	}
+}
+
 add_action( 'rest_api_init', static function (): void {
 	// Load payment module classes if not already autoloaded.
 	$base = CLIENTFLOW_DIR . 'modules/payments/';
@@ -342,9 +352,11 @@ function clientflow_rest_payment_webhook( WP_REST_Request $request ): WP_REST_Re
 	// ── Route by event type ───────────────────────────────────────────────────
 	switch ( $event['type'] ) {
 		case 'checkout.session.completed':
+		case 'checkout.session.async_payment_succeeded':
 			clientflow_handle_checkout_complete( $event['data']['object'] ?? [] );
 			break;
 
+		case 'checkout.session.async_payment_failed':
 		case 'checkout.session.expired':
 		case 'payment_intent.payment_failed':
 			$session_id = $event['data']['object']['id'] ?? '';
@@ -433,9 +445,13 @@ function clientflow_handle_checkout_complete( array $session ): void {
 		),
 		ARRAY_A
 	);
-	if ( $completed_project && function_exists( 'clientflow_maybe_send_testimonial_email' ) ) {
-		clientflow_maybe_send_testimonial_email( $completed_project, (int) $proposal['owner_id'] );
-	} elseif ( ! $completed_project && function_exists( 'clientflow_maybe_send_testimonial_email' ) ) {
+	if ( $completed_project ) {
+		wp_schedule_single_event(
+			time() + 60,
+			'clientflow_send_testimonial_email',
+			[ $completed_project, (int) $proposal['owner_id'] ]
+		);
+	} else {
 		$proposal_status = (string) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT status FROM {$wpdb->prefix}clientflow_proposals WHERE id = %d",
@@ -443,7 +459,11 @@ function clientflow_handle_checkout_complete( array $session ): void {
 			)
 		);
 		if ( 'completed' === $proposal_status ) {
-			clientflow_maybe_send_testimonial_email( [ 'proposal_id' => $proposal_id ], (int) $proposal['owner_id'] );
+			wp_schedule_single_event(
+				time() + 60,
+				'clientflow_send_testimonial_email',
+				[ [ 'proposal_id' => $proposal_id ], (int) $proposal['owner_id'] ]
+			);
 		}
 	}
 

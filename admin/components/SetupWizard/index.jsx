@@ -2,7 +2,8 @@
  * SetupWizard
  *
  * Full-screen onboarding wizard. Hides WP admin chrome on mount.
- * Five steps: Welcome → Plan → Stripe → Brand → Done
+ * Free plan: Welcome → Brand → Done (3 steps)
+ * Pro/Agency: Welcome → Payments → Brand → Done (4 steps)
  */
 import { useState, useEffect } from '@wordpress/element';
 
@@ -489,10 +490,10 @@ function injectStyles( id, css ) {
 // ─── Step definitions ─────────────────────────────────────────────────────────
 
 const STEPS = [
-	{ label: 'Welcome',   sub: 'Get started'          },
-	{ label: 'Payments',  sub: 'Stripe integration'    },
-	{ label: 'Brand',     sub: 'Your identity'         },
-	{ label: 'Done',      sub: 'All set!'              },
+	{ label: 'Welcome',  sub: 'Get started',       component: 'welcome'             },
+	{ label: 'Payments', sub: 'Stripe integration', component: 'stripe', proOnly: true },
+	{ label: 'Brand',    sub: 'Your identity',      component: 'brand'               },
+	{ label: 'Done',     sub: 'All set!',           component: 'done'                },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -567,30 +568,22 @@ function WelcomeStep() {
 	);
 }
 
-function StripeStep( { data, onChange, plan } ) {
-	const isFree = plan === 'free' || ! plan;
-
+function StripeStep( { data, onChange, stepNum, stepTotal } ) {
 	return (
 		<div>
-			<p className="cf-sw-step-num">Step 2 of 4</p>
+			<p className="cf-sw-step-num">Step { stepNum } of { stepTotal }</p>
 			<h1 className="cf-sw-heading">Connect Stripe</h1>
 			<p className="cf-sw-sub">
 				Accept payments directly within proposals. You can always add this later in Settings.
 			</p>
-			{ isFree && (
-				<div className="cf-sw-stripe-note">
-					<strong>Stripe is available on Pro and Agency plans.</strong> You can skip this step and upgrade later from Settings → Plan & Usage.
-				</div>
-			) }
 			<div className="cf-sw-field">
 				<label className="cf-sw-label">Publishable Key</label>
 				<input
-					className={ `cf-sw-input monospace${ isFree ? '' : '' }` }
+					className="cf-sw-input monospace"
 					type="text"
 					placeholder="pk_live_…"
 					value={ data.stripe_pk || '' }
 					onChange={ e => onChange( 'stripe_pk', e.target.value ) }
-					disabled={ isFree }
 				/>
 			</div>
 			<div className="cf-sw-field">
@@ -601,7 +594,6 @@ function StripeStep( { data, onChange, plan } ) {
 					placeholder="sk_live_…"
 					value={ data.stripe_sk || '' }
 					onChange={ e => onChange( 'stripe_sk', e.target.value ) }
-					disabled={ isFree }
 				/>
 			</div>
 			<div className="cf-sw-field">
@@ -615,19 +607,18 @@ function StripeStep( { data, onChange, plan } ) {
 					placeholder="whsec_…"
 					value={ data.stripe_webhook_secret || '' }
 					onChange={ e => onChange( 'stripe_webhook_secret', e.target.value ) }
-					disabled={ isFree }
 				/>
 			</div>
 		</div>
 	);
 }
 
-function BrandStep( { data, onChange } ) {
+function BrandStep( { data, onChange, stepNum, stepTotal } ) {
 	const color = data.brand_color || '#6366f1';
 
 	return (
 		<div>
-			<p className="cf-sw-step-num">Step 3 of 4</p>
+			<p className="cf-sw-step-num">Step { stepNum } of { stepTotal }</p>
 			<h1 className="cf-sw-heading">Your Brand</h1>
 			<p className="cf-sw-sub">
 				Your branding appears on proposals, emails, and the client portal.
@@ -752,6 +743,10 @@ export default function SetupWizard() {
 	const [ saving,    setSaving    ] = useState( false );
 	const [ error,     setError     ] = useState( null );
 	const [ plan ] = useState( window.cfData?.userPlan || '' );
+	const isFree       = plan === 'free' || ! plan;
+	const steps        = isFree ? STEPS.filter( s => ! s.proOnly ) : STEPS;
+	const doneStep     = steps.length - 1;
+	const lastEditStep = steps.length - 2;
 	const [ data,      setData      ] = useState( {
 		stripe_pk:             '',
 		stripe_sk:             '',
@@ -770,7 +765,7 @@ export default function SetupWizard() {
 				setData( prev => ( { ...prev, ...status.saved } ) );
 			}
 			if ( status.step > 0 ) {
-				setStep( Math.min( status.step, 3 ) );
+				setStep( Math.min( status.step, doneStep ) );
 			}
 		} ).catch( () => {} );
 
@@ -786,17 +781,17 @@ export default function SetupWizard() {
 		setSaving( true );
 		try {
 			// Save current step's data.
-			if ( step > 0 && step < 3 ) {
+			if ( step > 0 && step < doneStep ) {
 				await apiFetch( 'onboarding/save', {
 					method: 'POST',
 					body:   JSON.stringify( { step, ...data } ),
 				} );
 			}
-			// Step 2 (Brand): save then mark complete before rendering done.
-			if ( step === 2 ) {
+			// Brand step (last editable): save then mark complete before rendering done.
+			if ( step === lastEditStep ) {
 				await apiFetch( 'onboarding/save', {
 					method: 'POST',
-					body:   JSON.stringify( { step: 2, ...data } ),
+					body:   JSON.stringify( { step: lastEditStep, ...data } ),
 				} );
 				await apiFetch( 'onboarding/complete', { method: 'POST', body: '{}' } );
 			}
@@ -822,8 +817,8 @@ export default function SetupWizard() {
 		return 'upcoming';
 	};
 
-	const primaryLabel = step === 0 ? 'Get Started →'
-		: step === 2 ? ( saving ? 'Saving…' : 'Finish Setup →' )
+	const primaryLabel = step === 0          ? 'Get Started →'
+		: step === lastEditStep ? ( saving ? 'Saving…' : 'Finish Setup →' )
 		: ( saving ? 'Saving…' : 'Save & Continue →' );
 
 	return (
@@ -841,7 +836,7 @@ export default function SetupWizard() {
 				</div>
 
 				<div className="cf-sw-steps">
-					{ STEPS.map( ( s, idx ) => {
+					{ steps.map( ( s, idx ) => {
 						const state = stepDotState( idx );
 						return (
 							<div className="cf-sw-step-row" key={ idx }>
@@ -876,15 +871,15 @@ export default function SetupWizard() {
 			<div className="cf-sw-right">
 				<div className="cf-sw-content">
 					<div key={ step } className={ animClass }>
-						{ step === 0 && <WelcomeStep /> }
-						{ step === 1 && <StripeStep  data={ data } onChange={ handleChange } plan={ plan } /> }
-						{ step === 2 && <BrandStep   data={ data } onChange={ handleChange } /> }
-						{ step === 3 && <DoneStep /> }
+						{ steps[ step ]?.component === 'welcome' && <WelcomeStep /> }
+						{ steps[ step ]?.component === 'stripe'  && <StripeStep data={ data } onChange={ handleChange } stepNum={ step + 1 } stepTotal={ steps.length } /> }
+						{ steps[ step ]?.component === 'brand'   && <BrandStep  data={ data } onChange={ handleChange } stepNum={ step + 1 } stepTotal={ steps.length } /> }
+						{ steps[ step ]?.component === 'done'    && <DoneStep /> }
 					</div>
 					{ error && <div className="cf-sw-error">{ error }</div> }
 				</div>
 
-				{ step < 3 && (
+				{ step < doneStep && (
 					<div className="cf-sw-nav">
 						<div className="cf-sw-nav-left">
 							{ step > 0 && (
@@ -892,7 +887,7 @@ export default function SetupWizard() {
 									← Back
 								</button>
 							) }
-							{ step === 1 && (
+							{ steps[ step ]?.component === 'stripe' && (
 								<button className="cf-sw-skip" onClick={ goNext } disabled={ saving }>
 									Skip for now
 								</button>

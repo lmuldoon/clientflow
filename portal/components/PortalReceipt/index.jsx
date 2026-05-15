@@ -68,7 +68,6 @@ injectStyles( 'cprc-s', `
 
 /* ── Header band ─────────────────────────────────────── */
 .cprc-header {
-	background: #1A1A2E;
 	padding: 32px 44px;
 	display: flex;
 	align-items: center;
@@ -275,6 +274,16 @@ injectStyles( 'cprc-s', `
 }
 ` );
 
+function getContrastColor( hex ) {
+	const c = ( hex || '#6366F1' ).replace( '#', '' );
+	const r = parseInt( c.substring( 0, 2 ), 16 ) / 255;
+	const g = parseInt( c.substring( 2, 4 ), 16 ) / 255;
+	const b = parseInt( c.substring( 4, 6 ), 16 ) / 255;
+	const lin = x => x <= 0.04045 ? x / 12.92 : Math.pow( ( x + 0.055 ) / 1.055, 2.4 );
+	const L = 0.2126 * lin( r ) + 0.7152 * lin( g ) + 0.0722 * lin( b );
+	return L > 0.35 ? '#1A1A2E' : '#ffffff';
+}
+
 export default function PortalReceipt() {
 	const [ state,   setState   ] = useState( 'loading' ); // 'loading' | 'loaded' | 'error'
 	const [ data,    setData    ] = useState( null );
@@ -313,7 +322,9 @@ export default function PortalReceipt() {
 		return <div className="cprc-page"><p className="cprc-status">Receipt not found.</p></div>;
 	}
 
-	const { payment, payment_type, client_name, client_email, business_name, business_logo } = data;
+	const { payment, payment_type, client_name, client_email, business_name, business_logo, brand_color } = data;
+	const headerBg      = brand_color || '#6366F1';
+	const headerText    = getContrastColor( headerBg );
 	const receiptNum = pad( payment.id );
 	const paidDate   = formatDate( payment.completed_at || payment.created_at );
 
@@ -330,14 +341,14 @@ export default function PortalReceipt() {
 
 			<div className="cprc-card">
 				{ /* Header */ }
-				<div className="cprc-header">
+				<div className="cprc-header" style={ { background: headerBg } }>
 					<div>
 						{ business_logo
 							? <img src={ business_logo } alt={ business_name } className="cprc-logo" />
-							: <p className="cprc-biz-name">{ business_name }</p>
+							: <p className="cprc-biz-name" style={ { color: headerText === '#ffffff' ? 'rgba(255,255,255,.7)' : 'rgba(26,26,46,.7)' } }>{ business_name }</p>
 						}
 					</div>
-					<p className="cprc-receipt-label">Receipt</p>
+					<p className="cprc-receipt-label" style={ { color: headerText } }>Receipt</p>
 				</div>
 
 				{ /* Meta grid */ }

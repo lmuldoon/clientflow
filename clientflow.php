@@ -4,7 +4,7 @@
  * Plugin URI:  https://wpclientflow.co.uk
  * Description: All-in-one client workflow management for WordPress — proposals, payments, projects, and client portals.
  * Version:     0.1.2
- * Author:      Codievolt
+ * Author:      codievolt
  * Author URI:  https://codievolt.com
  * License:     GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -440,6 +440,15 @@ final class ClientFlow {
 			return $configured ? $configured : $name;
 		} );
 
+		// Ensure clientflow_member always has 'read' so users can access wp-admin.
+		// Runs on 'init' (before admin_init) so the cap is present before WP checks access.
+		add_action( 'init', static function (): void {
+			$role = get_role( 'clientflow_member' );
+			if ( $role && ! $role->has_cap( 'read' ) ) {
+				$role->add_cap( 'read' );
+			}
+		} );
+
 		// Ensure administrator and clientflow_member roles always have manage_clientflow,
 		// even on installs that were active before this capability was introduced.
 		// Also strip the clientflow_member role from any user who has it but is not
@@ -582,6 +591,14 @@ final class ClientFlow {
 		};
 		add_action( 'set_user_role', $enforce_team_role, 10, 2 );
 		add_action( 'add_user_role', $enforce_team_role, 10, 2 );
+
+		// Redirect team members to ClientFlow after login instead of the homepage.
+		add_filter( 'login_redirect', static function ( string $redirect_to, string $_requested, $user ): string {
+			if ( $user instanceof WP_User && in_array( 'clientflow_member', (array) $user->roles, true ) ) {
+				return admin_url( 'admin.php?page=clientflow-proposals' );
+			}
+			return $redirect_to;
+		}, 10, 3 );
 
 		// Mark a team member's invite as accepted the first time they log in.
 		add_action( 'wp_login', static function ( string $_login, WP_User $user ): void {

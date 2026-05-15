@@ -501,25 +501,12 @@ class ClientFlow_Proposal_Handlers {
 			'cta_url'   => $proposal_url,
 		] );
 
-		// WordPress uses PHP's mail() function by default, which has a 63-char line
-		// length limit for headers. PHPMailer Q-encodes subjects longer than ~47 chars
-		// and folds them with \n — PHP's mail() then mangles the folded encoded-words,
-		// causing the subject to arrive blank. Setting UseSMTPUTF8 makes encodeHeader()
-		// return the raw string instead of applying RFC 2047 encoding/wrapping.
-		$fix_subject_encoding = static function ( $mailer ) use ( &$fix_subject_encoding ): void {
-			remove_action( 'phpmailer_init', $fix_subject_encoding, 999 );
-			$mailer->UseSMTPUTF8 = true; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
-		};
-		add_action( 'phpmailer_init', $fix_subject_encoding, 999 );
-
 		wp_mail(
 			$recipient,
 			$subject,
 			$message,
 			[ 'Content-Type: text/html; charset=UTF-8' ]
 		);
-
-		remove_action( 'phpmailer_init', $fix_subject_encoding, 999 );
 	}
 }
 

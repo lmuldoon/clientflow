@@ -68,6 +68,7 @@ export async function cfFetch( path, options = {} ) {
 	const url = ( apiUrl || '/wp-json/clientflow/v1/' ) + path;
 
 	const res = await fetch( url, {
+		cache: 'no-store',
 		...options,
 		headers: {
 			'Content-Type': 'application/json',

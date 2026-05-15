@@ -231,6 +231,9 @@ class ClientFlow_Entitlements {
 	public static function get_user_plan( int $user_id ): string {
 		global $wpdb;
 
+		// Team members inherit their owner's plan.
+		$user_id = clientflow_get_owner_id( $user_id );
+
 		$plan = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT plan FROM {$wpdb->prefix}clientflow_user_meta WHERE user_id = %d",
